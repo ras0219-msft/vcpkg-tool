@@ -629,21 +629,57 @@ namespace vcpkg::Downloads
                     fs, read_url, m_config.m_read_headers, download_path, sha512, m_config.m_secrets, errors))
                 return read_url;
         }
-        else if (auto token = m_config.m_terrapin.get())
+        else if (auto azcli = m_config.m_terrapin_azcli.get())
         {
-            // WIP: use `az account get-access-token --resource https://microsoft.onmicrosoft.com/RebuildManager.Web` to
-            // generate a token
-            //
-            // The az CLI can be portably downloaded by vcpkg fetch if you add the following to scripts/vcpkgTools.xml:
-            //
-            // <tool name="azcli" os="windows">
-            //     <version>2.26.1</version>
-            //     <exeRelativePath>Microsoft SDKs\Azure\CLI2\wbin\az.cmd</exeRelativePath>
-            //     <url>https://github.com/Azure/azure-cli/releases/download/azure-cli-2.26.1/azure-cli-2.26.1.msi</url>
-            //     <sha512>e1d3b2ad4df21bb8418ff17c7c47cc8bb0c56d98d873fa37ad21b9d409ffed89e90d3443e66cffc3e752eabce1a5ca79d763513bf4b0386133947cf5332f4753</sha512>
-            //     <archiveName>azure-cli-2.26.1.msi</archiveName>
-            // </tool>
-            std::string authheader = Strings::concat("Authorization: Bearer ", *token);
+            std::string authheader;
+            {
+                // The az CLI can be portably downloaded by vcpkg fetch if you add the following to
+                // scripts/vcpkgTools.xml:
+                //
+                // <tool name="azcli" os="windows">
+                //     <version>2.26.1</version>
+                //     <exeRelativePath>Microsoft SDKs\Azure\CLI2\wbin\az.cmd</exeRelativePath>
+                //     <url>https://github.com/Azure/azure-cli/releases/download/azure-cli-2.26.1/azure-cli-2.26.1.msi</url>
+                //     <sha512>e1d3b2ad4df21bb8418ff17c7c47cc8bb0c56d98d873fa37ad21b9d409ffed89e90d3443e66cffc3e752eabce1a5ca79d763513bf4b0386133947cf5332f4753</sha512>
+                //     <archiveName>azure-cli-2.26.1.msi</archiveName>
+                // </tool>
+
+                Command azcmd{*azcli};
+                azcmd.string_arg("account")
+                    .string_arg("get-access-token")
+                    .string_arg("--resource")
+                    .string_arg("https://microsoft.onmicrosoft.com/RebuildManager.Web");
+                auto res_gat = cmd_execute_and_capture_output(azcmd);
+                if (res_gat.exit_code != 0)
+                {
+                    Checks::exit_with_message(
+                        VCPKG_LINE_INFO,
+                        "Error: Failed to get access token from az cli (exit code %d):\n    %s\n%s",
+                        res_gat.exit_code,
+                        azcmd.command_line(),
+                        res_gat.output);
+                }
+                auto maybe_doc = Json::parse(res_gat.output);
+                auto doc = maybe_doc.get();
+                Json::Value* token;
+                if (!doc || !doc->first.is_object())
+                {
+                    goto invalid_gat_response;
+                }
+                token = doc->first.object().get("accessToken");
+                if (token && token->is_string())
+                {
+                    authheader = Strings::concat("Authorization: Bearer ", token->string());
+                }
+                else
+                {
+                invalid_gat_response:
+                    Checks::exit_with_message(VCPKG_LINE_INFO,
+                                              "Error: az get-access-token did not return expected json:\n    %s\n%s",
+                                              azcmd.command_line(),
+                                              res_gat.output);
+                }
+            }
             auto read_url =
                 Strings::concat("https://terradev-wus2-api.azurewebsites.net/Vcpkg/", sha512, "?api-version=1.0");
             if (Downloads::try_download_file(fs, read_url, {&authheader, 1}, download_path, sha512, {}, errors))

@@ -1616,8 +1616,7 @@ namespace
         std::vector<std::string> url_templates_to_get;
         std::vector<std::string> azblob_templates_to_put;
         std::vector<std::string> secrets;
-
-        Optional<std::string> enable_terrapin;
+        Optional<path> azcli_path;
 
         void clear()
         {
@@ -1626,7 +1625,7 @@ namespace
             url_templates_to_get.clear();
             azblob_templates_to_put.clear();
             secrets.clear();
-            enable_terrapin = nullopt;
+            azcli_path = nullopt;
         }
     };
 
@@ -1715,18 +1714,14 @@ namespace
             }
             else if (segments[0].second == "x-terrapin")
             {
-                // Scheme: x-terrapin,<token>
-                if (segments.size() > 2)
+                // Scheme: x-terrapin[,<path-to-az>]
+                if (segments.size() != 2)
                 {
-                    return add_error("expected arguments: asset config 'terrapin' requires one token argument",
-                                     segments[2].first);
-                }
-                else if (segments.size() == 1)
-                {
-                    return add_error("expected arguments: asset config 'terrapin' requires one token argument",
+                    return add_error("expected arguments: asset config 'terrapin' requires only the path to the azure "
+                                     "cli as an argument",
                                      segments[0].first);
                 }
-                state->enable_terrapin = segments[1].second;
+                state->azcli_path = u8path(segments[1].second);
             }
             else
             {
@@ -1787,7 +1782,7 @@ ExpectedS<Downloads::DownloadManagerConfig> vcpkg::parse_download_configuration(
                                             std::move(put_headers),
                                             std::move(s.secrets),
                                             s.block_origin,
-                                            s.enable_terrapin};
+                                            s.azcli_path};
 }
 
 ExpectedS<std::vector<std::unique_ptr<IBinaryProvider>>> vcpkg::create_binary_providers_from_configs(
