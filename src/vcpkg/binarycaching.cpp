@@ -1617,6 +1617,8 @@ namespace
         std::vector<std::string> azblob_templates_to_put;
         std::vector<std::string> secrets;
 
+        Optional<std::string> enable_terrapin;
+
         void clear()
         {
             cleared = true;
@@ -1624,6 +1626,7 @@ namespace
             url_templates_to_get.clear();
             azblob_templates_to_put.clear();
             secrets.clear();
+            enable_terrapin = nullopt;
         }
     };
 
@@ -1710,11 +1713,26 @@ namespace
                 handle_readwrite(
                     state->url_templates_to_get, state->azblob_templates_to_put, std::move(p), segments, 3);
             }
+            else if (segments[0].second == "x-terrapin")
+            {
+                // Scheme: x-terrapin,<token>
+                if (segments.size() > 2)
+                {
+                    return add_error("expected arguments: asset config 'terrapin' requires one token argument",
+                                     segments[2].first);
+                }
+                else if (segments.size() == 1)
+                {
+                    return add_error("expected arguments: asset config 'terrapin' requires one token argument",
+                                     segments[0].first);
+                }
+                state->enable_terrapin = segments[1].second;
+            }
             else
             {
-                return add_error(
-                    "unknown asset provider type: valid source types are 'x-azurl', 'x-block-origin', and 'clear'",
-                    segments[0].first);
+                return add_error("unknown asset provider type: valid source types are 'x-azurl', "
+                                 "'x-terrapin', 'x-block-origin', and 'clear'",
+                                 segments[0].first);
             }
         }
     };
@@ -1768,7 +1786,8 @@ ExpectedS<Downloads::DownloadManagerConfig> vcpkg::parse_download_configuration(
                                             std::move(put_url),
                                             std::move(put_headers),
                                             std::move(s.secrets),
-                                            s.block_origin};
+                                            s.block_origin,
+                                            s.enable_terrapin};
 }
 
 ExpectedS<std::vector<std::unique_ptr<IBinaryProvider>>> vcpkg::create_binary_providers_from_configs(

@@ -1,6 +1,7 @@
 #include <vcpkg/base/cache.h>
 #include <vcpkg/base/downloads.h>
 #include <vcpkg/base/hash.h>
+#include <vcpkg/base/json.h>
 #include <vcpkg/base/lockguarded.h>
 #include <vcpkg/base/system.debug.h>
 #include <vcpkg/base/system.h>
@@ -391,6 +392,33 @@ namespace vcpkg::Downloads
         return code;
     }
 
+    ExpectedS<std::string> post_data(StringView url, View<std::string> headers, StringView data)
+    {
+        static constexpr StringLiteral guid_marker = "9a1db05f-a65d-419b-aa72-037fb4d0672e";
+
+        Command cmd;
+        cmd.string_arg("curl").string_arg("-X").string_arg("POST");
+        for (auto&& header : headers)
+        {
+            cmd.string_arg("-H").string_arg(header);
+        }
+        cmd.string_arg("-d").string_arg(data);
+        cmd.string_arg(url);
+        auto res = cmd_execute_and_capture_output(cmd);
+        if (res.exit_code != 0)
+        {
+            return {Strings::concat("Error: curl failed to put file to ",
+                                    url,
+                                    " with exit code '",
+                                    res.exit_code,
+                                    "' and output:\n",
+                                    res.output,
+                                    "\n"),
+                    expected_right_tag};
+        }
+        return {res.output, expected_left_tag};
+    }
+
 #if defined(_WIN32)
     namespace
     {
@@ -600,6 +628,49 @@ namespace vcpkg::Downloads
             if (Downloads::try_download_file(
                     fs, read_url, m_config.m_read_headers, download_path, sha512, m_config.m_secrets, errors))
                 return read_url;
+        }
+        else if (auto token = m_config.m_terrapin.get())
+        {
+            // WIP: use `az account get-access-token --resource https://microsoft.onmicrosoft.com/RebuildManager.Web` to
+            // generate a token
+            //
+            // The az CLI can be portably downloaded by vcpkg fetch if you add the following to scripts/vcpkgTools.xml:
+            //
+            // <tool name="azcli" os="windows">
+            //     <version>2.26.1</version>
+            //     <exeRelativePath>Microsoft SDKs\Azure\CLI2\wbin\az.cmd</exeRelativePath>
+            //     <url>https://github.com/Azure/azure-cli/releases/download/azure-cli-2.26.1/azure-cli-2.26.1.msi</url>
+            //     <sha512>e1d3b2ad4df21bb8418ff17c7c47cc8bb0c56d98d873fa37ad21b9d409ffed89e90d3443e66cffc3e752eabce1a5ca79d763513bf4b0386133947cf5332f4753</sha512>
+            //     <archiveName>azure-cli-2.26.1.msi</archiveName>
+            // </tool>
+            std::string authheader = Strings::concat("Authorization: Bearer ", *token);
+            auto read_url =
+                Strings::concat("https://terradev-wus2-api.azurewebsites.net/Vcpkg/", sha512, "?api-version=1.0");
+            if (Downloads::try_download_file(fs, read_url, {&authheader, 1}, download_path, sha512, {}, errors))
+                return read_url;
+
+            if (urls.size() == 0)
+            {
+                Strings::append(errors, "Error: No urls specified to download SHA: ", sha512);
+            }
+            else
+            {
+                Json::Object doc;
+                doc.insert("artifactUrl", Json::Value::string(urls[0]));
+                doc.insert("artifactSha512", Json::Value::string(sha512));
+
+                auto req = Downloads::post_data("https://terradev-wus2-api.azurewebsites.net/Vcpkg?api-version=1.0",
+                                                std::vector<std::string>{authheader, "Content-Type: application/json"},
+                                                Json::stringify(doc, {}));
+
+                if (Downloads::try_download_file(fs, read_url, {&authheader, 1}, download_path, sha512, {}, errors))
+                    return read_url;
+
+                Checks::exit_with_message(VCPKG_LINE_INFO,
+                                          "Error: Failed to download from terrapin:\n%s\n%s",
+                                          errors,
+                                          req.has_value() ? *req.get() : req.error());
+            }
         }
 
         if (!m_config.m_block_origin)

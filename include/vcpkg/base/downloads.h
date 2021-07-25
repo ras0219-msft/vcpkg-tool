@@ -31,6 +31,7 @@ namespace vcpkg::Downloads
 
     std::vector<int> download_files(Filesystem& fs, View<std::pair<std::string, path>> url_pairs);
     ExpectedS<int> put_file(const Filesystem&, StringView url, View<std::string> headers, const path& file);
+    ExpectedS<std::string> post_data(StringView url, View<std::string> headers, StringView data);
     std::vector<int> url_heads(View<std::string> urls, View<std::string> headers);
     std::string replace_secrets(std::string input, View<std::string> secrets);
 
@@ -42,6 +43,7 @@ namespace vcpkg::Downloads
         std::vector<std::string> m_write_headers;
         std::vector<std::string> m_secrets;
         bool m_block_origin = false;
+        Optional<std::string> m_terrapin;
     };
 
     // Handles downloading and uploading to a content addressable mirror
