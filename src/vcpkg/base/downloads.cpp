@@ -681,7 +681,7 @@ namespace vcpkg::Downloads
                 }
             }
             auto read_url =
-                Strings::concat("https://terradev-wus2-api.azurewebsites.net/Vcpkg/", sha512, "?api-version=1.0");
+                Strings::concat("https://terradev-wus2-api.azurewebsites.net/api/Vcpkg/", sha512, "?api-version=1.0");
             if (Downloads::try_download_file(fs, read_url, {&authheader, 1}, download_path, sha512, {}, errors))
                 return read_url;
 
@@ -695,7 +695,7 @@ namespace vcpkg::Downloads
                 doc.insert("artifactUrl", Json::Value::string(urls[0]));
                 doc.insert("artifactSha512", Json::Value::string(sha512));
 
-                auto req = Downloads::post_data("https://terradev-wus2-api.azurewebsites.net/Vcpkg?api-version=1.0",
+                auto req = Downloads::post_data("https://terradev-wus2-api.azurewebsites.net/api/Vcpkg?api-version=1.0",
                                                 std::vector<std::string>{authheader, "Content-Type: application/json"},
                                                 Json::stringify(doc, {}));
 
