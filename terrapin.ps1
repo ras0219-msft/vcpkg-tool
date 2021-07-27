@@ -16,16 +16,16 @@ Param(
     [String]$Path
 )
 
-$res_gat = & $az account get-access-token --resource https://microsoft.onmicrosoft.com/RebuildManager.Web | ConvertFrom-Json
+$res_gat = & $az account get-access-token --resource https://mspmecloud.onmicrosoft.com/RebuildManager.Web | ConvertFrom-Json
 if ($LASTEXITCODE -ne 0) {
-    throw "Failed to execute $az account get-access-token --resource https://microsoft.onmicrosoft.com/RebuildManager.Web:`n$res_gat"
+    throw "Failed to execute `"$az account get-access-token --resource https://mspmecloud.onmicrosoft.com/RebuildManager.Web`" :`n$res_gat"
 }
 
 curl.exe `
     --fail `
     -L `
     -H "Authorization: Bearer $($res_gat.accessToken)" `
-    "https://terradev-wus2-api.azurewebsites.net/api/Vcpkg/${Sha512}?api-version=1.0" `
+    "https://api.devpackages.microsoft.io/api/Vcpkg/${Sha512}?api-version=1.0" `
     --output $Path
 
 if ($LASTEXITCODE -eq 0) {
@@ -41,13 +41,13 @@ curl.exe `
     -H "Authorization: Bearer $($res_gat.accessToken)" `
     -H "Content-Type: application/json" `
     -d $data `
-    "https://terradev-wus2-api.azurewebsites.net/api/Vcpkg?api-version=1.0"
+    "https://api.devpackages.microsoft.io/api/Vcpkg?api-version=1.0"
 
 curl.exe `
     --fail `
     -L `
     -H "Authorization: Bearer $($res_gat.accessToken)" `
-    "https://terradev-wus2-api.azurewebsites.net/api/Vcpkg/${Sha512}?api-version=1.0" `
+    "https://api.devpackages.microsoft.io/api/Vcpkg/${Sha512}?api-version=1.0" `
     --output $Path
 
 exit $LASTEXITCODE
