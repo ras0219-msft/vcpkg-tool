@@ -43,7 +43,7 @@ namespace vcpkg::Downloads
         std::vector<std::string> m_write_headers;
         std::vector<std::string> m_secrets;
         bool m_block_origin = false;
-        Optional<path> m_terrapin_azcli;
+        Optional<std::string> m_script;
     };
 
     // Handles downloading and uploading to a content addressable mirror

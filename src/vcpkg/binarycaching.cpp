@@ -1616,7 +1616,7 @@ namespace
         std::vector<std::string> url_templates_to_get;
         std::vector<std::string> azblob_templates_to_put;
         std::vector<std::string> secrets;
-        Optional<path> azcli_path;
+        Optional<std::string> script;
 
         void clear()
         {
@@ -1625,7 +1625,7 @@ namespace
             url_templates_to_get.clear();
             azblob_templates_to_put.clear();
             secrets.clear();
-            azcli_path = nullopt;
+            script = nullopt;
         }
     };
 
@@ -1712,21 +1712,21 @@ namespace
                 handle_readwrite(
                     state->url_templates_to_get, state->azblob_templates_to_put, std::move(p), segments, 3);
             }
-            else if (segments[0].second == "x-terrapin")
+            else if (segments[0].second == "x-script")
             {
-                // Scheme: x-terrapin[,<path-to-az>]
+                // Scheme: x-script,<script-template>
                 if (segments.size() != 2)
                 {
-                    return add_error("expected arguments: asset config 'terrapin' requires only the path to the azure "
-                                     "cli as an argument",
-                                     segments[0].first);
+                    return add_error(
+                        "expected arguments: asset config 'x-script' requires exactly the exec template as an argument",
+                        segments[0].first);
                 }
-                state->azcli_path = u8path(segments[1].second);
+                state->script = segments[1].second;
             }
             else
             {
                 return add_error("unknown asset provider type: valid source types are 'x-azurl', "
-                                 "'x-terrapin', 'x-block-origin', and 'clear'",
+                                 "'x-script', 'x-block-origin', and 'clear'",
                                  segments[0].first);
             }
         }
@@ -1782,7 +1782,7 @@ ExpectedS<Downloads::DownloadManagerConfig> vcpkg::parse_download_configuration(
                                             std::move(put_headers),
                                             std::move(s.secrets),
                                             s.block_origin,
-                                            s.azcli_path};
+                                            s.script};
 }
 
 ExpectedS<std::vector<std::unique_ptr<IBinaryProvider>>> vcpkg::create_binary_providers_from_configs(
@@ -2036,13 +2036,17 @@ void vcpkg::help_topic_asset_caching(const VcpkgPaths&)
     tbl.format("clear", "Removes all previous sources");
     tbl.format(
         "x-azurl,<url>[,<sas>[,<rw>]]",
-        "Adds an Azure Blob Storage source, optionally using Shared Access Signature validation. URL should "
-        "include "
+        "Adds an Azure Blob Storage source, optionally using Shared Access Signature validation. URL should include "
         "the container path and be terminated with a trailing `/`. SAS, if defined, should be prefixed with a `?`. "
-        "Non-Azure servers will also work if they respond to GET and PUT requests of the form: "
-        "`<url><sha512><sas>`.");
+        "Non-Azure servers will also work if they respond to GET and PUT requests of the form: `<url><sha512><sas>`.");
+    tbl.format(
+        "x-script,<template>",
+        "Dispatches to an external tool to fetch the asset. Within the template, ${url} will be replaced by the "
+        "original url, ${sha512} will be replaced by the SHA512 value, and ${dst} will be replaced by the "
+        "output path to save as. These substitutions will all be properly escaped, so an example template "
+        "would be: \"curl -L ${url} --output ${dst}\". $$ will be replaced by $ and can be used to avoid expansion.");
     tbl.format("x-block-origin",
-               "Disables use of the original URLs in case the mirror does not have the file available.");
+               "Disables fallback to the original URLs in case the mirror does not have the file available.");
     tbl.blank();
     tbl.text("The `<rw>` optional parameter for certain strings controls how they will be accessed. It can be "
              "specified as `read`, `write`, or `readwrite` and defaults to `read`.");

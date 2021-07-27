@@ -615,6 +615,42 @@ namespace vcpkg::Downloads
         this->download_file(fs, View<std::string>(&url, 1), headers, download_path, sha512);
     }
 
+    // Handles ${val} -> f(out, val), $$ -> $
+    static std::string string_subst(StringView sv, std::function<void(std::string&, StringView)> append_f)
+    {
+        std::string out;
+        auto prev = sv.begin();
+        const auto last = sv.end();
+        for (const char* p = std::find(prev, last, '$'); p != last && p + 1 != last; p = std::find(p, last, '$'))
+        {
+            // p[0] == '$'
+            out.append(prev, p);
+            if (p[1] == '$')
+            {
+                out.push_back('$');
+                p += 2;
+                prev = p;
+            }
+            else if (p[1] == '{')
+            {
+                const auto cparen = std::find(p + 2, last, '}');
+                if (cparen != last)
+                {
+                    append_f(out, StringView{p + 2, cparen});
+                    p = cparen + 1;
+                    prev = p;
+                }
+            }
+            else
+            {
+                prev = p;
+                ++p;
+            }
+        }
+        out.append(prev, last);
+        return out;
+    }
+
     std::string DownloadManager::download_file(Filesystem& fs,
                                                View<std::string> urls,
                                                View<std::string> headers,
@@ -622,6 +658,10 @@ namespace vcpkg::Downloads
                                                const std::string& sha512) const
     {
         std::string errors;
+        if (urls.size() == 0)
+        {
+            Strings::append(errors, "Error: No urls specified to download SHA: ", sha512);
+        }
         if (auto read_template = m_config.m_read_url_template.get())
         {
             auto read_url = Strings::replace_all(std::string(*read_template), "<SHA>", sha512);
@@ -629,93 +669,71 @@ namespace vcpkg::Downloads
                     fs, read_url, m_config.m_read_headers, download_path, sha512, m_config.m_secrets, errors))
                 return read_url;
         }
-        else if (auto azcli = m_config.m_terrapin_azcli.get())
+        else if (auto script = m_config.m_script.get())
         {
-            std::string authheader;
+            // The az CLI can be portably downloaded by vcpkg fetch if you add the following to
+            // scripts/vcpkgTools.xml:
+            //
+            // <tool name="azcli" os="windows">
+            //     <version>2.26.1</version>
+            //     <exeRelativePath>Microsoft SDKs\Azure\CLI2\wbin\az.cmd</exeRelativePath>
+            //     <url>https://github.com/Azure/azure-cli/releases/download/azure-cli-2.26.1/azure-cli-2.26.1.msi</url>
+            //     <sha512>e1d3b2ad4df21bb8418ff17c7c47cc8bb0c56d98d873fa37ad21b9d409ffed89e90d3443e66cffc3e752eabce1a5ca79d763513bf4b0386133947cf5332f4753</sha512>
+            //     <archiveName>azure-cli-2.26.1.msi</archiveName>
+            // </tool>
+            if (urls.size() != 0)
             {
-                // The az CLI can be portably downloaded by vcpkg fetch if you add the following to
-                // scripts/vcpkgTools.xml:
-                //
-                // <tool name="azcli" os="windows">
-                //     <version>2.26.1</version>
-                //     <exeRelativePath>Microsoft SDKs\Azure\CLI2\wbin\az.cmd</exeRelativePath>
-                //     <url>https://github.com/Azure/azure-cli/releases/download/azure-cli-2.26.1/azure-cli-2.26.1.msi</url>
-                //     <sha512>e1d3b2ad4df21bb8418ff17c7c47cc8bb0c56d98d873fa37ad21b9d409ffed89e90d3443e66cffc3e752eabce1a5ca79d763513bf4b0386133947cf5332f4753</sha512>
-                //     <archiveName>azure-cli-2.26.1.msi</archiveName>
-                // </tool>
+                auto download_path_part_path = download_path;
+#if defined(_WIN32)
+                download_path_part_path += vcpkg::u8path(Strings::concat(".", _getpid(), ".part"));
+#else
+                download_path_part_path += vcpkg::u8path(Strings::concat(".", getpid(), ".part"));
+#endif
 
-                Command azcmd{*azcli};
-                azcmd.string_arg("account")
-                    .string_arg("get-access-token")
-                    .string_arg("--resource")
-                    .string_arg("https://microsoft.onmicrosoft.com/RebuildManager.Web");
-                auto res_gat = cmd_execute_and_capture_output(azcmd);
-                if (res_gat.exit_code != 0)
+                const auto escaped_url = Command(urls[0]).extract();
+                const auto escaped_sha512 = Command(sha512).extract();
+                const auto escaped_dpath = Command(download_path_part_path).extract();
+
+                auto cmd = string_subst(*script, [&](std::string& out, StringView key) {
+                    if (key == "url")
+                    {
+                        Strings::append(out, escaped_url);
+                    }
+                    else if (key == "sha512")
+                    {
+                        Strings::append(out, escaped_sha512);
+                    }
+                    else if (key == "dst")
+                    {
+                        Strings::append(out, escaped_dpath);
+                    }
+                });
+
+                auto res = cmd_execute_and_capture_output(Command{}.raw_arg(cmd), get_clean_environment(), true);
+                if (res.exit_code == 0)
                 {
-                    Checks::exit_with_message(
-                        VCPKG_LINE_INFO,
-                        "Error: Failed to get access token from az cli (exit code %d):\n    %s\n%s",
-                        res_gat.exit_code,
-                        azcmd.command_line(),
-                        res_gat.output);
-                }
-                auto maybe_doc = Json::parse(res_gat.output);
-                auto doc = maybe_doc.get();
-                Json::Value* token;
-                if (!doc || !doc->first.is_object())
-                {
-                    goto invalid_gat_response;
-                }
-                token = doc->first.object().get("accessToken");
-                if (token && token->is_string())
-                {
-                    authheader = Strings::concat("Authorization: Bearer ", token->string());
+                    auto maybe_error =
+                        try_verify_downloaded_file_hash(fs, "<mirror-script>", download_path_part_path, sha512);
+                    if (auto err = maybe_error.get())
+                    {
+                        Strings::append(errors, *err);
+                    }
+                    else
+                    {
+                        fs.rename(download_path_part_path, download_path, VCPKG_LINE_INFO);
+                        return urls[0];
+                    }
                 }
                 else
                 {
-                invalid_gat_response:
-                    Checks::exit_with_message(VCPKG_LINE_INFO,
-                                              "Error: az get-access-token did not return expected json:\n    %s\n%s",
-                                              azcmd.command_line(),
-                                              res_gat.output);
+                    Strings::append(errors, res.output);
                 }
-            }
-            auto read_url =
-                Strings::concat("https://terradev-wus2-api.azurewebsites.net/api/Vcpkg/", sha512, "?api-version=1.0");
-            if (Downloads::try_download_file(fs, read_url, {&authheader, 1}, download_path, sha512, {}, errors))
-                return read_url;
-
-            if (urls.size() == 0)
-            {
-                Strings::append(errors, "Error: No urls specified to download SHA: ", sha512);
-            }
-            else
-            {
-                Json::Object doc;
-                doc.insert("artifactUrl", Json::Value::string(urls[0]));
-                doc.insert("artifactSha512", Json::Value::string(sha512));
-
-                auto req = Downloads::post_data("https://terradev-wus2-api.azurewebsites.net/api/Vcpkg?api-version=1.0",
-                                                std::vector<std::string>{authheader, "Content-Type: application/json"},
-                                                Json::stringify(doc, {}));
-
-                if (Downloads::try_download_file(fs, read_url, {&authheader, 1}, download_path, sha512, {}, errors))
-                    return read_url;
-
-                Checks::exit_with_message(VCPKG_LINE_INFO,
-                                          "Error: Failed to download from terrapin:\n%s\n%s",
-                                          errors,
-                                          req.has_value() ? *req.get() : req.error());
             }
         }
 
         if (!m_config.m_block_origin)
         {
-            if (urls.size() == 0)
-            {
-                Strings::append(errors, "Error: No urls specified to download SHA: ", sha512);
-            }
-            else
+            if (urls.size() != 0)
             {
                 auto maybe_url =
                     try_download_files(fs, urls, headers, download_path, sha512, m_config.m_secrets, errors);
