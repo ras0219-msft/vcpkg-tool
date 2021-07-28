@@ -1,6 +1,9 @@
 # Use as:
 #   x-script,C:\path\to\pwsh.exe C:\path\to\terrapin.ps1 -az C:\path\to\az\cli\az.cmd -url ${url} -sha512 ${sha512} -path ${dst};x-block-origin
 
+# You may need to run this first:
+#   az login --scope https://mspmecloud.onmicrosoft.com/RebuildManager.Web/.default
+
 [CmdletBinding(PositionalBinding=$False)]
 Param(
     [Parameter(Mandatory=$True)]
