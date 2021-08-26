@@ -1,6 +1,7 @@
 #include <vcpkg/base/cache.h>
 #include <vcpkg/base/downloads.h>
 #include <vcpkg/base/hash.h>
+#include <vcpkg/base/json.h>
 #include <vcpkg/base/lockguarded.h>
 #include <vcpkg/base/system.debug.h>
 #include <vcpkg/base/system.h>
@@ -414,6 +415,33 @@ namespace vcpkg::Downloads
         return code;
     }
 
+    ExpectedS<std::string> post_data(StringView url, View<std::string> headers, StringView data)
+    {
+        static constexpr StringLiteral guid_marker = "9a1db05f-a65d-419b-aa72-037fb4d0672e";
+
+        Command cmd;
+        cmd.string_arg("curl").string_arg("-X").string_arg("POST");
+        for (auto&& header : headers)
+        {
+            cmd.string_arg("-H").string_arg(header);
+        }
+        cmd.string_arg("-d").string_arg(data);
+        cmd.string_arg(url);
+        auto res = cmd_execute_and_capture_output(cmd);
+        if (res.exit_code != 0)
+        {
+            return {Strings::concat("Error: curl failed to put file to ",
+                                    url,
+                                    " with exit code '",
+                                    res.exit_code,
+                                    "' and output:\n",
+                                    res.output,
+                                    "\n"),
+                    expected_right_tag};
+        }
+        return {res.output, expected_left_tag};
+    }
+
 #if defined(_WIN32)
     namespace
     {
@@ -574,6 +602,42 @@ namespace vcpkg::Downloads
         this->download_file(fs, View<std::string>(&url, 1), headers, download_path, sha512);
     }
 
+    // Handles ${val} -> f(out, val), $$ -> $
+    static std::string string_subst(StringView sv, std::function<void(std::string&, StringView)> append_f)
+    {
+        std::string out;
+        auto prev = sv.begin();
+        const auto last = sv.end();
+        for (const char* p = std::find(prev, last, '$'); p != last && p + 1 != last; p = std::find(p, last, '$'))
+        {
+            // p[0] == '$'
+            out.append(prev, p);
+            if (p[1] == '$')
+            {
+                out.push_back('$');
+                p += 2;
+                prev = p;
+            }
+            else if (p[1] == '{')
+            {
+                const auto cparen = std::find(p + 2, last, '}');
+                if (cparen != last)
+                {
+                    append_f(out, StringView{p + 2, cparen});
+                    p = cparen + 1;
+                    prev = p;
+                }
+            }
+            else
+            {
+                prev = p;
+                ++p;
+            }
+        }
+        out.append(prev, last);
+        return out;
+    }
+
     std::string DownloadManager::download_file(Filesystem& fs,
                                                View<std::string> urls,
                                                View<std::string> headers,
@@ -581,6 +645,17 @@ namespace vcpkg::Downloads
                                                const Optional<std::string>& sha512) const
     {
         std::string errors;
+        if (urls.size() == 0)
+        {
+            if (auto hash = sha512.get())
+            {
+                Strings::append(errors, "Error: No urls specified to download SHA: ", *hash);
+            }
+            else
+            {
+                Strings::append(errors, "Error: No urls specified and no hash specified.");
+            }
+        }
         if (auto hash = sha512.get())
         {
             if (auto read_template = m_config.m_read_url_template.get())
@@ -590,22 +665,72 @@ namespace vcpkg::Downloads
                         fs, read_url, m_config.m_read_headers, download_path, sha512, m_config.m_secrets, errors))
                     return read_url;
             }
+            else if (auto script = m_config.m_script.get())
+            {
+                // The az CLI can be portably downloaded by vcpkg fetch if you add the following to
+                // scripts/vcpkgTools.xml:
+                //
+                // <tool name="azcli" os="windows">
+                //     <version>2.26.1</version>
+                //     <exeRelativePath>Microsoft SDKs\Azure\CLI2\wbin\az.cmd</exeRelativePath>
+                //     <url>https://github.com/Azure/azure-cli/releases/download/azure-cli-2.26.1/azure-cli-2.26.1.msi</url>
+                //     <sha512>e1d3b2ad4df21bb8418ff17c7c47cc8bb0c56d98d873fa37ad21b9d409ffed89e90d3443e66cffc3e752eabce1a5ca79d763513bf4b0386133947cf5332f4753</sha512>
+                //     <archiveName>azure-cli-2.26.1.msi</archiveName>
+                // </tool>
+                if (urls.size() != 0)
+                {
+                    auto download_path_part_path = download_path;
+#if defined(_WIN32)
+                    download_path_part_path += Strings::concat(".", _getpid(), ".part");
+#else
+                    download_path_part_path += Strings::concat(".", getpid(), ".part");
+#endif
+
+                    const auto escaped_url = Command(urls[0]).extract();
+                    const auto escaped_sha512 = Command(*hash).extract();
+                    const auto escaped_dpath = Command(download_path_part_path).extract();
+
+                    auto cmd = string_subst(*script, [&](std::string& out, StringView key) {
+                        if (key == "url")
+                        {
+                            Strings::append(out, escaped_url);
+                        }
+                        else if (key == "sha512")
+                        {
+                            Strings::append(out, escaped_sha512);
+                        }
+                        else if (key == "dst")
+                        {
+                            Strings::append(out, escaped_dpath);
+                        }
+                    });
+
+                    auto res = cmd_execute_and_capture_output(Command{}.raw_arg(cmd), get_clean_environment(), true);
+                    if (res.exit_code == 0)
+                    {
+                        auto maybe_error =
+                            try_verify_downloaded_file_hash(fs, "<mirror-script>", download_path_part_path, *hash);
+                        if (auto err = maybe_error.get())
+                        {
+                            Strings::append(errors, *err);
+                        }
+                        else
+                        {
+                            fs.rename(download_path_part_path, download_path, VCPKG_LINE_INFO);
+                            return urls[0];
+                        }
+                    }
+                    else
+                    {
+                        Strings::append(errors, res.output);
+                    }
+                }
+            }
         }
 
         if (!m_config.m_block_origin)
         {
-            if (urls.size() == 0)
-            {
-                if (auto hash = sha512.get())
-                {
-                    Strings::append(errors, "Error: No urls specified to download SHA: ", *hash, '\n');
-                }
-                else
-                {
-                    Strings::append(errors, "Error: No urls specified\n");
-                }
-            }
-            else
+            if (urls.size() != 0)
             {
                 auto maybe_url =
                     try_download_files(fs, urls, headers, download_path, sha512, m_config.m_secrets, errors);
