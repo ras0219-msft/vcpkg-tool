@@ -18,6 +18,11 @@ using namespace vcpkg;
 using namespace vcpkg::Paragraphs;
 using namespace vcpkg::Test;
 
+namespace vcpkg::Json
+{
+    static ExpectedS<std::pair<Value, JsonStyle>> parse(StringView json) { return parse(json, {}); }
+}
+
 static Json::Object parse_json_object(StringView sv)
 {
     auto json = Json::parse(sv);
@@ -28,7 +33,7 @@ static Json::Object parse_json_object(StringView sv)
     }
     else
     {
-        Checks::exit_with_message(VCPKG_LINE_INFO, json.error()->format());
+        Checks::exit_with_message(VCPKG_LINE_INFO, json.error());
     }
 }
 

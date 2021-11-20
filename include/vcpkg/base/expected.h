@@ -146,6 +146,9 @@ namespace vcpkg
 
         S&& error() && { return std::move(this->m_s.error()); }
 
+        const S* get_error() const& { return m_s.has_error() ? &this->m_s.error() : nullptr; }
+        S* get_error() & { return m_s.has_error() ? &this->m_s.error() : nullptr; }
+
         typename ExpectedHolder<T>::const_pointer get() const
         {
             if (!this->has_value())

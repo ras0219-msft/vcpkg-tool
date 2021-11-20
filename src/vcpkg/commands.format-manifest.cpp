@@ -25,20 +25,19 @@ namespace
 
     Optional<ToWrite> read_manifest(Filesystem& fs, Path&& manifest_path)
     {
-        auto path_string = manifest_path.native();
-        Debug::print("Reading ", path_string, "\n");
+        Debug::print("Reading ", manifest_path, "\n");
         auto contents = fs.read_contents(manifest_path, VCPKG_LINE_INFO);
         auto parsed_json_opt = Json::parse(contents, manifest_path);
-        if (!parsed_json_opt.has_value())
+        if (auto err = parsed_json_opt.get_error())
         {
-            vcpkg::printf(Color::error, "Failed to parse %s: %s\n", path_string, parsed_json_opt.error()->format());
+            vcpkg::printf(Color::error, "Failed to parse %s:\n%s", manifest_path, *err);
             return nullopt;
         }
 
         const auto& parsed_json = parsed_json_opt.value_or_exit(VCPKG_LINE_INFO).first;
         if (!parsed_json.is_object())
         {
-            vcpkg::printf(Color::error, "The file %s is not an object\n", path_string);
+            vcpkg::printf(Color::error, "The file %s is not an object\n", manifest_path);
             return nullopt;
         }
 
@@ -47,7 +46,7 @@ namespace
         auto scf = SourceControlFile::parse_manifest_file(manifest_path, parsed_json_obj);
         if (!scf.has_value())
         {
-            vcpkg::printf(Color::error, "Failed to parse manifest file: %s\n", path_string);
+            vcpkg::printf(Color::error, "Failed to parse manifest file: %s\n", manifest_path);
             print_error_message(scf.error());
             return nullopt;
         }

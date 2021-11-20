@@ -988,8 +988,7 @@ namespace vcpkg::Json
                 }
             }
 
-            static ExpectedT<std::pair<Value, JsonStyle>, std::unique_ptr<Parse::IParseError>> parse(
-                StringView json, StringView origin) noexcept
+            static ExpectedS<std::pair<Value, JsonStyle>> parse(StringView json, StringView origin) noexcept
             {
                 StatsTimer t(g_json_parsing_stats);
 
@@ -1001,11 +1000,11 @@ namespace vcpkg::Json
                 if (!parser.at_eof())
                 {
                     parser.add_error("Unexpected character; expected EOF");
-                    return std::move(parser).extract_error();
+                    return std::move(parser).extract_error().value_or_exit(VCPKG_LINE_INFO);
                 }
                 else if (parser.get_error())
                 {
-                    return std::move(parser).extract_error();
+                    return std::move(parser).extract_error().value_or_exit(VCPKG_LINE_INFO);
                 }
                 else
                 {
@@ -1079,14 +1078,14 @@ namespace vcpkg::Json
         return true;
     }
 
-    ExpectedT<std::pair<Value, JsonStyle>, std::unique_ptr<Parse::IParseError>> parse_file(const Filesystem& fs,
-                                                                                           const Path& json_file,
-                                                                                           std::error_code& ec) noexcept
+    ExpectedS<std::pair<Value, JsonStyle>> parse_file(const Filesystem& fs,
+                                                      const Path& json_file,
+                                                      std::error_code& ec) noexcept
     {
         auto res = fs.read_contents(json_file, ec);
         if (ec)
         {
-            return std::unique_ptr<Parse::IParseError>();
+            return std::string();
         }
 
         return parse(std::move(res), json_file);
@@ -1103,15 +1102,14 @@ namespace vcpkg::Json
         }
         else if (!ret)
         {
-            print2(Color::error, "Failed to parse ", json_file, ":\n");
-            print2(ret.error()->format());
+            print2(Color::error, "Error: while parsing: ", json_file, "\n");
+            print2(ret.error());
             Checks::exit_fail(li);
         }
         return ret.value_or_exit(li);
     }
 
-    ExpectedT<std::pair<Value, JsonStyle>, std::unique_ptr<Parse::IParseError>> parse(StringView json,
-                                                                                      StringView origin) noexcept
+    ExpectedS<std::pair<Value, JsonStyle>> parse(StringView json, StringView origin) noexcept
     {
         return Parser::parse(json, origin);
     }

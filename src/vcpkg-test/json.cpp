@@ -25,6 +25,11 @@ static auto _u8_string_to_char_string(const char8_t (&literal)[Sz]) -> const cha
 namespace Json = vcpkg::Json;
 using Json::Value;
 
+namespace vcpkg::Json
+{
+    static ExpectedS<std::pair<Value, JsonStyle>> parse(StringView json) { return parse(json, {}); }
+}
+
 static std::string mystringify(const Value& val) { return Json::stringify(val, Json::JsonStyle{}); }
 
 TEST_CASE ("JSON stringify weird strings", "[json]")
@@ -225,7 +230,7 @@ TEST_CASE ("JSON parse full file", "[json]")
     auto res = Json::parse(json);
     if (!res)
     {
-        std::cerr << res.error()->format() << '\n';
+        INFO(res.error());
     }
     REQUIRE(res);
 }
@@ -234,7 +239,7 @@ TEST_CASE ("JSON track newlines", "[json]")
 {
     auto res = Json::parse("{\n,", "filename");
     REQUIRE(!res);
-    REQUIRE(res.error()->format() ==
+    REQUIRE(res.error() ==
             R"(filename:2:1: error: Unexpected character; expected property name
    on expression: ,
                   ^
@@ -245,7 +250,7 @@ TEST_CASE ("JSON duplicated object keys", "[json]")
 {
     auto res = Json::parse("{\"name\": 1, \"name\": 2}", "filename");
     REQUIRE(!res);
-    REQUIRE(res.error()->format() ==
+    REQUIRE(res.error() ==
             R"(filename:1:13: error: Duplicated key "name" in an object
    on expression: {"name": 1, "name": 2}
                               ^

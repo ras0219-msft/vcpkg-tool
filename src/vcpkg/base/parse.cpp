@@ -23,7 +23,8 @@ namespace vcpkg::Parse
         }
     }
 
-    std::string ParseError::format() const
+    static void append_error(
+        std::string& out, StringView origin, int row, int column, int caret_col, StringView line, StringView message)
     {
         auto caret_spacing = std::string(18, ' ');
         auto decoder = Unicode::Utf8Decoder(line.data(), line.data() + line.size());
@@ -34,22 +35,21 @@ namespace vcpkg::Parse
             caret_spacing.push_back(cp == '\t' ? '\t' : ' ');
         }
 
-        return Strings::concat(origin,
-                               ":",
-                               row,
-                               ":",
-                               column,
-                               ": error: ",
-                               message,
-                               "\n"
-                               "   on expression: ", // 18 columns
-                               line,
-                               "\n",
-                               caret_spacing,
-                               "^\n");
+        Strings::append(out,
+                        origin,
+                        ":",
+                        row,
+                        ":",
+                        column,
+                        ": error: ",
+                        message,
+                        "\n"
+                        "   on expression: ", // 18 columns
+                        line,
+                        "\n",
+                        caret_spacing,
+                        "^\n");
     }
-
-    const std::string& ParseError::get_message() const { return this->message; }
 
     ParserBase::ParserBase(StringView text, StringView origin, TextRowCol init_rowcol)
         : m_it(text.begin(), text.end())
@@ -84,7 +84,7 @@ namespace vcpkg::Parse
         return cur();
     }
 
-    void ParserBase::add_error(std::string message, const SourceLoc& loc)
+    void ParserBase::add_error(StringView message, const SourceLoc& loc)
     {
         // avoid cascading errors by only saving the first
         if (!m_err)
@@ -95,13 +95,14 @@ namespace vcpkg::Parse
             {
                 ++line_end;
             }
-            m_err = std::make_unique<ParseError>(
-                m_origin.to_string(),
-                loc.row,
-                loc.column,
-                static_cast<int>(std::distance(loc.start_of_line, loc.it)),
-                std::string(loc.start_of_line.pointer_to_current(), line_end.pointer_to_current()),
-                std::move(message));
+            m_err = std::string();
+            append_error(*m_err.get(),
+                         m_origin,
+                         loc.row,
+                         loc.column,
+                         static_cast<int>(std::distance(loc.start_of_line, loc.it)),
+                         StringView(loc.start_of_line.pointer_to_current(), line_end.pointer_to_current()),
+                         message);
         }
 
         // Avoid error loops by skipping to the end

@@ -1168,15 +1168,15 @@ namespace
         auto contents = fs.read_contents(versions_file_path, ec);
         if (ec)
         {
-            return Strings::format(
-                "Error: Failed to load the versions database file %s: %s", versions_file_path, ec.message());
+            return Strings::concat(
+                "Error: Failed to load the versions database file: ", versions_file_path, ": ", ec.message());
         }
 
-        auto maybe_versions_json = Json::parse(std::move(contents));
+        auto maybe_versions_json = Json::parse(std::move(contents), versions_file_path);
         if (!maybe_versions_json.has_value())
         {
-            return Strings::format(
-                "Error: failed to parse versions file for `%s`: %s", port_name, maybe_versions_json.error()->format());
+            return Strings::concat(
+                "Error: failed to parse versions file for `", port_name, "`:\n", maybe_versions_json.error());
         }
         if (!maybe_versions_json.get()->first.is_object())
         {
@@ -1211,8 +1211,7 @@ namespace
         auto maybe_value = Json::parse(contents, origin);
         if (!maybe_value.has_value())
         {
-            return Strings::format(
-                "Error: failed to parse baseline file: %s\n%s", origin, maybe_value.error()->format());
+            return Strings::concat("Error: failed to parse baseline file: ", origin, '\n', maybe_value.error());
         }
 
         auto& value = *maybe_value.get();

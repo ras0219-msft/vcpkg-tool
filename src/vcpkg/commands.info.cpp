@@ -77,7 +77,7 @@ namespace vcpkg::Commands::Info
                 }
                 if (auto err = parser.get_error())
                 {
-                    print2(err->format(), "\n");
+                    print2(*err, "\n");
                     Checks::exit_fail(VCPKG_LINE_INFO);
                 }
 
@@ -125,7 +125,7 @@ namespace vcpkg::Commands::Info
                 }
                 if (auto err = parser.get_error())
                 {
-                    print2(err->format(), "\n");
+                    print2(*err, "\n");
                     Checks::exit_fail(VCPKG_LINE_INFO);
                 }
 

@@ -14,6 +14,7 @@
 #include <vcpkg/dependencies.h>
 #include <vcpkg/metrics.h>
 #include <vcpkg/tools.h>
+#include <vcpkg/vcpkgpaths.h>
 
 #include <iterator>
 
@@ -1800,9 +1801,9 @@ ExpectedS<Downloads::DownloadManagerConfig> vcpkg::parse_download_configuration(
     AssetSourcesState s;
     AssetSourcesParser parser(*arg.get(), Strings::concat("$", VcpkgCmdArguments::ASSET_SOURCES_ENV), &s);
     parser.parse();
-    if (auto err = parser.get_error())
+    if (auto err = parser.extract_error())
     {
-        return Strings::concat(err->format(), "For more information, see ", s_assetcaching_doc_url, "\n");
+        return Strings::concat(std::move(*err.get()), "For more information, see ", s_assetcaching_doc_url, "\n");
     }
 
     if (s.azblob_templates_to_put.size() > 1)
@@ -1882,16 +1883,13 @@ ExpectedS<std::vector<std::unique_ptr<IBinaryProvider>>> vcpkg::create_binary_pr
 
     BinaryConfigParser default_parser("default,readwrite", "<defaults>", &s);
     default_parser.parse();
-    if (auto err = default_parser.get_error())
-    {
-        return err->get_message();
-    }
+    Checks::check_exit(VCPKG_LINE_INFO, !default_parser.get_error());
 
     BinaryConfigParser env_parser(env_string, "VCPKG_BINARY_SOURCES", &s);
     env_parser.parse();
     if (auto err = env_parser.get_error())
     {
-        return err->format();
+        return std::move(*err);
     }
 
     for (auto&& arg : args)
@@ -1900,7 +1898,7 @@ ExpectedS<std::vector<std::unique_ptr<IBinaryProvider>>> vcpkg::create_binary_pr
         arg_parser.parse();
         if (auto err = arg_parser.get_error())
         {
-            return err->format();
+            return std::move(*err);
         }
     }
 

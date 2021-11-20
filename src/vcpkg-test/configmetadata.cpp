@@ -39,7 +39,7 @@ static void CHECK_LINES(const std::string& a, const std::string& b)
 
 static Json::Object parse_json_object(StringView sv)
 {
-    auto json = Json::parse(sv);
+    auto json = Json::parse(sv, {});
     // we're not testing json parsing here, so just fail on errors
     if (auto r = json.get())
     {
@@ -47,7 +47,7 @@ static Json::Object parse_json_object(StringView sv)
     }
     else
     {
-        Checks::exit_with_message(VCPKG_LINE_INFO, json.error()->format());
+        Checks::exit_with_message(VCPKG_LINE_INFO, json.error());
     }
 }
 

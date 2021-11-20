@@ -11,8 +11,6 @@
 
 namespace vcpkg::PlatformExpression
 {
-    using vcpkg::Parse::ParseError;
-
     enum class Identifier
     {
         invalid = -1, // not a recognized identifier
@@ -628,11 +626,11 @@ namespace vcpkg::PlatformExpression
 
         if (auto p = parser.extract_error())
         {
-            return p->format();
+            return std::move(*p.get());
         }
         else
         {
-            return res;
+            return std::move(res);
         }
     }
 

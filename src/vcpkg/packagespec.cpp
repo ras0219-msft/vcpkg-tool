@@ -117,8 +117,14 @@ namespace vcpkg
     {
         auto parser = Parse::ParserBase(input, "<unknown>");
         auto maybe_pqs = parse_qualified_specifier(parser);
-        if (!parser.at_eof()) parser.add_error("expected eof");
-        if (auto e = parser.get_error()) return e->format();
+        if (!parser.at_eof())
+        {
+            parser.add_error("expected eof");
+        }
+        if (auto e = parser.extract_error())
+        {
+            return std::move(*e.get());
+        }
         return std::move(maybe_pqs).value_or_exit(VCPKG_LINE_INFO);
     }
 

@@ -107,7 +107,7 @@ namespace vcpkg::Parse
     {
         auto parser = Parse::ParserBase(str, origin, textrowcol);
         auto opt = parse_list_until_eof<std::string>("default features", parser, &parse_feature_name);
-        if (!opt) return {parser.get_error()->format(), expected_right_tag};
+        if (auto err = parser.extract_error()) return {std::move(*err.get()), expected_right_tag};
         return {std::move(opt).value_or_exit(VCPKG_LINE_INFO), expected_left_tag};
     }
     ExpectedS<std::vector<ParsedQualifiedSpecifier>> parse_qualified_specifier_list(const std::string& str,
@@ -117,7 +117,7 @@ namespace vcpkg::Parse
         auto parser = Parse::ParserBase(str, origin, textrowcol);
         auto opt = parse_list_until_eof<ParsedQualifiedSpecifier>(
             "dependencies", parser, [](ParserBase& parser) { return parse_qualified_specifier(parser); });
-        if (!opt) return {parser.get_error()->format(), expected_right_tag};
+        if (auto err = parser.extract_error()) return {std::move(*err.get()), expected_right_tag};
 
         return {std::move(opt).value_or_exit(VCPKG_LINE_INFO), expected_left_tag};
     }
@@ -137,7 +137,7 @@ namespace vcpkg::Parse
                 return Dependency{pqs.name, pqs.features.value_or({}), pqs.platform.value_or({})};
             });
         });
-        if (!opt) return {parser.get_error()->format(), expected_right_tag};
+        if (auto err = parser.extract_error()) return {std::move(*err.get()), expected_right_tag};
 
         return {std::move(opt).value_or_exit(VCPKG_LINE_INFO), expected_left_tag};
     }
@@ -145,91 +145,100 @@ namespace vcpkg::Parse
 
 namespace vcpkg::Paragraphs
 {
-    struct PghParser : private Parse::ParserBase
+    namespace
     {
-    private:
-        void get_fieldvalue(std::string& fieldvalue)
+        struct PghParser : Parse::ParserBase
         {
-            fieldvalue.clear();
-
-            do
+        private:
+            void get_fieldvalue(std::string& fieldvalue)
             {
-                // scan to end of current line (it is part of the field value)
-                Strings::append(fieldvalue, match_until(is_lineend));
-                skip_newline();
+                fieldvalue.clear();
 
-                if (cur() != ' ') return;
-                auto spacing = skip_tabs_spaces();
-                if (is_lineend(cur())) return add_error("unexpected end of line, to span a blank line use \"  .\"");
-                Strings::append(fieldvalue, "\n", spacing);
-            } while (true);
-        }
-
-        void get_fieldname(std::string& fieldname)
-        {
-            fieldname = match_zero_or_more(is_alphanumdash).to_string();
-            if (fieldname.empty()) return add_error("expected fieldname");
-        }
-
-        void get_paragraph(Paragraph& fields)
-        {
-            fields.clear();
-            std::string fieldname;
-            std::string fieldvalue;
-            do
-            {
-                if (cur() == '#')
+                do
                 {
-                    skip_line();
-                    continue;
+                    // scan to end of current line (it is part of the field value)
+                    Strings::append(fieldvalue, match_until(is_lineend));
+                    skip_newline();
+
+                    if (cur() != ' ') return;
+                    auto spacing = skip_tabs_spaces();
+                    if (is_lineend(cur())) return add_error("unexpected end of line, to span a blank line use \"  .\"");
+                    Strings::append(fieldvalue, "\n", spacing);
+                } while (true);
+            }
+
+            void get_fieldname(std::string& fieldname)
+            {
+                fieldname = match_zero_or_more(is_alphanumdash).to_string();
+                if (fieldname.empty()) return add_error("expected fieldname");
+            }
+
+            void get_paragraph(Paragraph& fields)
+            {
+                fields.clear();
+                std::string fieldname;
+                std::string fieldvalue;
+                do
+                {
+                    if (cur() == '#')
+                    {
+                        skip_line();
+                        continue;
+                    }
+
+                    auto loc = cur_loc();
+                    get_fieldname(fieldname);
+                    if (cur() != ':') return add_error("expected ':' after field name");
+                    if (Util::Sets::contains(fields, fieldname)) return add_error("duplicate field", loc);
+                    next();
+                    skip_tabs_spaces();
+                    auto rowcol = cur_rowcol();
+                    get_fieldvalue(fieldvalue);
+
+                    fields.emplace(fieldname, std::make_pair(fieldvalue, rowcol));
+                } while (!is_lineend(cur()));
+            }
+
+        public:
+            PghParser(StringView text, StringView origin) : Parse::ParserBase(text, origin) { }
+
+            std::vector<Paragraph> get_paragraphs()
+            {
+                std::vector<Paragraph> paragraphs;
+
+                skip_whitespace();
+                while (!at_eof())
+                {
+                    paragraphs.emplace_back();
+                    get_paragraph(paragraphs.back());
+                    match_zero_or_more(is_lineend);
                 }
 
-                auto loc = cur_loc();
-                get_fieldname(fieldname);
-                if (cur() != ':') return add_error("expected ':' after field name");
-                if (Util::Sets::contains(fields, fieldname)) return add_error("duplicate field", loc);
-                next();
-                skip_tabs_spaces();
-                auto rowcol = cur_rowcol();
-                get_fieldvalue(fieldvalue);
-
-                fields.emplace(fieldname, std::make_pair(fieldvalue, rowcol));
-            } while (!is_lineend(cur()));
-        }
-
-    public:
-        PghParser(StringView text, StringView origin) : Parse::ParserBase(text, origin) { }
-
-        ExpectedS<std::vector<Paragraph>> get_paragraphs()
-        {
-            std::vector<Paragraph> paragraphs;
-
-            skip_whitespace();
-            while (!at_eof())
-            {
-                paragraphs.emplace_back();
-                get_paragraph(paragraphs.back());
-                match_zero_or_more(is_lineend);
+                return paragraphs;
             }
-            if (get_error()) return get_error()->format();
 
-            return paragraphs;
-        }
-    };
+            Paragraph parse_single_paragraph()
+            {
+                auto pghs = get_paragraphs();
+                if (pghs.size() != 1)
+                {
+                    add_error("There should be exactly one paragraph");
+                    return {};
+                }
+                return std::move(pghs.front());
+            }
+        };
+    }
 
     ExpectedS<Paragraph> parse_single_paragraph(StringView str, StringView origin)
     {
-        auto pghs = PghParser(str, origin).get_paragraphs();
-
-        if (auto p = pghs.get())
+        PghParser parser(str, origin);
+        auto pgh = parser.parse_single_paragraph();
+        if (auto err = parser.get_error())
         {
-            if (p->size() != 1) return {"There should be exactly one paragraph", expected_right_tag};
-            return std::move(p->front());
+            return std::move(*err);
         }
-        else
-        {
-            return pghs.error();
-        }
+        return std::move(pgh);
     }
 
     ExpectedS<Paragraph> get_single_paragraph(const Filesystem& fs, const Path& control_path)
@@ -263,7 +272,13 @@ namespace vcpkg::Paragraphs
 
     ExpectedS<std::vector<Paragraph>> parse_paragraphs(StringView str, StringView origin)
     {
-        return PghParser(str, origin).get_paragraphs();
+        PghParser parser(str, origin);
+        auto pgh = parser.get_paragraphs();
+        if (auto err = parser.get_error())
+        {
+            return std::move(*err);
+        }
+        return std::move(pgh);
     }
 
     bool is_port_directory(const Filesystem& fs, const Path& maybe_directory)
@@ -274,7 +289,7 @@ namespace vcpkg::Paragraphs
 
     static ParseExpected<SourceControlFile> try_load_manifest_text(const std::string& text, StringView origin)
     {
-        auto res = Json::parse(text);
+        auto res = Json::parse(text, origin);
 
         std::string error;
         if (auto val = res.get())
@@ -288,7 +303,7 @@ namespace vcpkg::Paragraphs
         }
         else
         {
-            error = res.error()->format();
+            error = std::move(res).error();
         }
         auto error_info = std::make_unique<ParseControlErrorInfo>();
         error_info->name = origin.to_string();

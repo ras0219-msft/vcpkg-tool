@@ -101,7 +101,7 @@ namespace vcpkg
         if (!manifest_opt.has_value())
         {
             Checks::exit_maybe_upgrade(
-                VCPKG_LINE_INFO, "Failed to parse manifest at %s:\n%s", manifest_path, manifest_opt.error()->format());
+                VCPKG_LINE_INFO, "Failed to parse manifest at %s:\n%s", manifest_path, manifest_opt.error());
         }
         auto manifest_value = std::move(manifest_opt).value_or_exit(VCPKG_LINE_INFO);
 
@@ -413,7 +413,7 @@ namespace vcpkg
             }
             else
             {
-                print2(Color::error, "Error: Invalid bundle definition.\n", maybe_bundle_doc.error()->format());
+                print2(Color::error, "Error: Invalid bundle definition.\n", maybe_bundle_doc.error());
                 Checks::exit_fail(VCPKG_LINE_INFO);
             }
         }
@@ -764,7 +764,7 @@ namespace vcpkg
         }
         else
         {
-            Debug::print("Failed to load lockfile:\n", maybe_lock_contents.error()->format());
+            Debug::print("Failed to load lockfile:\n", maybe_lock_contents.error());
             return ret;
         }
     }

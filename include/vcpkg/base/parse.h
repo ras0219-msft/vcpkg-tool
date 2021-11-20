@@ -12,36 +12,6 @@
 
 namespace vcpkg::Parse
 {
-    struct IParseError
-    {
-        virtual ~IParseError() = default;
-        virtual std::string format() const = 0;
-        virtual const std::string& get_message() const = 0;
-    };
-
-    struct ParseError : IParseError
-    {
-        ParseError(std::string origin, int row, int column, int caret_col, std::string line, std::string message)
-            : origin(std::move(origin))
-            , row(row)
-            , column(column)
-            , caret_col(caret_col)
-            , line(std::move(line))
-            , message(std::move(message))
-        {
-        }
-
-        const std::string origin;
-        const int row;
-        const int column;
-        const int caret_col;
-        const std::string line;
-        const std::string message;
-
-        virtual std::string format() const override;
-        virtual const std::string& get_message() const override;
-    };
-
     struct ParserBase
     {
         struct SourceLoc
@@ -108,11 +78,12 @@ namespace vcpkg::Parse
         char32_t next();
         bool at_eof() const { return m_it == m_it.end(); }
 
-        void add_error(std::string message) { add_error(std::move(message), cur_loc()); }
-        void add_error(std::string message, const SourceLoc& loc);
+        void add_error(StringView message) { add_error(message, cur_loc()); }
+        void add_error(StringView message, const SourceLoc& loc);
 
-        const Parse::IParseError* get_error() const { return m_err.get(); }
-        std::unique_ptr<Parse::IParseError> extract_error() { return std::move(m_err); }
+        std::string* get_error() { return m_err.get(); }
+        const std::string* get_error() const { return m_err.get(); }
+        Optional<std::string> extract_error() { return std::move(m_err); }
 
     private:
         Unicode::Utf8Decoder m_it;
@@ -123,6 +94,6 @@ namespace vcpkg::Parse
         StringView m_text;
         StringView m_origin;
 
-        std::unique_ptr<IParseError> m_err;
+        Optional<std::string> m_err;
     };
 }

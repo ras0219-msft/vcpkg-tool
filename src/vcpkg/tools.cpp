@@ -46,7 +46,7 @@ namespace vcpkg
         return result;
     }
 
-    static ExpectedT<ToolData, std::string> parse_tool_data_from_xml(const VcpkgPaths& paths, const std::string& tool)
+    static ExpectedS<ToolData> parse_tool_data_from_xml(const VcpkgPaths& paths, const std::string& tool)
     {
 #if defined(_WIN32)
         static constexpr StringLiteral OS_STRING = "windows";
