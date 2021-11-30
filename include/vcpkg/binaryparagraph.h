@@ -1,5 +1,7 @@
 #pragma once
 
+#include <vcpkg/fwd/binaryparagraph.h>
+
 #include <vcpkg/packagespec.h>
 #include <vcpkg/paragraphparser.h>
 #include <vcpkg/sourceparagraph.h>

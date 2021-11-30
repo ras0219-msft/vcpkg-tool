@@ -1,5 +1,7 @@
 #pragma once
 
+#include <vcpkg/base/fwd/graphs.h>
+
 #include <vcpkg/fwd/cmakevars.h>
 #include <vcpkg/fwd/portfileprovider.h>
 
@@ -12,16 +14,6 @@
 #include <functional>
 #include <map>
 #include <vector>
-
-namespace vcpkg::Graphs
-{
-    struct Randomizer;
-}
-
-namespace vcpkg
-{
-    struct StatusParagraphs;
-}
 
 namespace vcpkg::Dependencies
 {

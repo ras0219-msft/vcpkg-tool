@@ -224,8 +224,6 @@ TEST_CASE ("registry_parsing", "[registries]")
 
 TEST_CASE ("git_version_db_parsing", "[registries]")
 {
-    VersionDbEntryArrayDeserializer filesystem_version_db{VersionDbType::Git, "a/b"};
-    Json::Reader r;
     auto test_json = parse_json(R"json(
 [
     {
@@ -245,24 +243,20 @@ TEST_CASE ("git_version_db_parsing", "[registries]")
     }
 ]
 )json");
-
-    auto results_opt = r.visit(test_json, filesystem_version_db);
-    auto& results = results_opt.value_or_exit(VCPKG_LINE_INFO);
+    auto r = deserialize_version_db_array(test_json, VersionDbType::Git, "a/b");
+    REQUIRE(r);
+    auto& results = r.value_or_exit(VCPKG_LINE_INFO);
     CHECK(results[0].version == VersionT{"2021-06-26", 0});
     CHECK(results[0].git_tree == "9b07f8a38bbc4d13f8411921e6734753e15f8d50");
     CHECK(results[1].version == VersionT{"2021-01-14", 0});
     CHECK(results[1].git_tree == "12b84a31469a78dd4b42dcf58a27d4600f6b2d48");
     CHECK(results[2].version == VersionT{"2020-04-12", 0});
     CHECK(results[2].git_tree == "bd4565e8ab55bc5e098a1750fa5ff0bc4406ca9b");
-    CHECK(r.errors().empty());
 }
 
 TEST_CASE ("filesystem_version_db_parsing", "[registries]")
 {
-    VersionDbEntryArrayDeserializer filesystem_version_db{VersionDbType::Filesystem, "a/b"};
-
     {
-        Json::Reader r;
         auto test_json = parse_json(R"json(
 [
     {
@@ -282,19 +276,18 @@ TEST_CASE ("filesystem_version_db_parsing", "[registries]")
     }
 ]
     )json");
-        auto results_opt = r.visit(test_json, filesystem_version_db);
-        auto& results = results_opt.value_or_exit(VCPKG_LINE_INFO);
+        auto r = deserialize_version_db_array(test_json, VersionDbType::Filesystem, "a/b");
+        REQUIRE(r);
+        auto& results = r.value_or_exit(VCPKG_LINE_INFO);
         CHECK(results[0].version == VersionT{"puppies", 0});
         CHECK(results[0].p == "a/b" VCPKG_PREFERRED_SEPARATOR "c/d");
         CHECK(results[1].version == VersionT{"doggies", 0});
         CHECK(results[1].p == "a/b" VCPKG_PREFERRED_SEPARATOR "e/d");
         CHECK(results[2].version == VersionT{"1.2.3", 0});
         CHECK(results[2].p == "a/b" VCPKG_PREFERRED_SEPARATOR "semvers/here");
-        CHECK(r.errors().empty());
     }
 
     { // missing $/
-        Json::Reader r;
         auto test_json = parse_json(R"json(
 [
     {
@@ -304,8 +297,7 @@ TEST_CASE ("filesystem_version_db_parsing", "[registries]")
     }
 ]
     )json");
-        CHECK(r.visit(test_json, filesystem_version_db).value_or_exit(VCPKG_LINE_INFO).empty());
-        CHECK(!r.errors().empty());
+        REQUIRE(!deserialize_version_db_array(test_json, VersionDbType::Filesystem, "a/b").has_value());
     }
 
     { // uses backslash
@@ -319,12 +311,10 @@ TEST_CASE ("filesystem_version_db_parsing", "[registries]")
     }
 ]
     )json");
-        CHECK(r.visit(test_json, filesystem_version_db).value_or_exit(VCPKG_LINE_INFO).empty());
-        CHECK(!r.errors().empty());
+        REQUIRE(!deserialize_version_db_array(test_json, VersionDbType::Filesystem, "a/b").has_value());
     }
 
     { // doubled slash
-        Json::Reader r;
         auto test_json = parse_json(R"json(
 [
     {
@@ -334,12 +324,10 @@ TEST_CASE ("filesystem_version_db_parsing", "[registries]")
     }
 ]
     )json");
-        CHECK(r.visit(test_json, filesystem_version_db).value_or_exit(VCPKG_LINE_INFO).empty());
-        CHECK(!r.errors().empty());
+        REQUIRE(!deserialize_version_db_array(test_json, VersionDbType::Filesystem, "a/b").has_value());
     }
 
     { // dot path (first)
-        Json::Reader r;
         auto test_json = parse_json(R"json(
 [
     {
@@ -349,12 +337,10 @@ TEST_CASE ("filesystem_version_db_parsing", "[registries]")
     }
 ]
     )json");
-        CHECK(r.visit(test_json, filesystem_version_db).value_or_exit(VCPKG_LINE_INFO).empty());
-        CHECK(!r.errors().empty());
+        REQUIRE(!deserialize_version_db_array(test_json, VersionDbType::Filesystem, "a/b").has_value());
     }
 
     { // dot path (mid)
-        Json::Reader r;
         auto test_json = parse_json(R"json(
 [
     {
@@ -364,12 +350,10 @@ TEST_CASE ("filesystem_version_db_parsing", "[registries]")
     }
 ]
     )json");
-        CHECK(r.visit(test_json, filesystem_version_db).value_or_exit(VCPKG_LINE_INFO).empty());
-        CHECK(!r.errors().empty());
+        REQUIRE(!deserialize_version_db_array(test_json, VersionDbType::Filesystem, "a/b").has_value());
     }
 
     { // dot path (last)
-        Json::Reader r;
         auto test_json = parse_json(R"json(
 [
     {
@@ -379,12 +363,10 @@ TEST_CASE ("filesystem_version_db_parsing", "[registries]")
     }
 ]
     )json");
-        CHECK(r.visit(test_json, filesystem_version_db).value_or_exit(VCPKG_LINE_INFO).empty());
-        CHECK(!r.errors().empty());
+        REQUIRE(!deserialize_version_db_array(test_json, VersionDbType::Filesystem, "a/b").has_value());
     }
 
     { // dot dot path (first)
-        Json::Reader r;
         auto test_json = parse_json(R"json(
 [
     {
@@ -394,12 +376,10 @@ TEST_CASE ("filesystem_version_db_parsing", "[registries]")
     }
 ]
     )json");
-        CHECK(r.visit(test_json, filesystem_version_db).value_or_exit(VCPKG_LINE_INFO).empty());
-        CHECK(!r.errors().empty());
+        REQUIRE(!deserialize_version_db_array(test_json, VersionDbType::Filesystem, "a/b").has_value());
     }
 
     { // dot dot path (mid)
-        Json::Reader r;
         auto test_json = parse_json(R"json(
 [
     {
@@ -409,12 +389,10 @@ TEST_CASE ("filesystem_version_db_parsing", "[registries]")
     }
 ]
     )json");
-        CHECK(r.visit(test_json, filesystem_version_db).value_or_exit(VCPKG_LINE_INFO).empty());
-        CHECK(!r.errors().empty());
+        REQUIRE(!deserialize_version_db_array(test_json, VersionDbType::Filesystem, "a/b").has_value());
     }
 
     { // dot dot path (last)
-        Json::Reader r;
         auto test_json = parse_json(R"json(
 [
     {
@@ -424,7 +402,6 @@ TEST_CASE ("filesystem_version_db_parsing", "[registries]")
     }
 ]
     )json");
-        CHECK(r.visit(test_json, filesystem_version_db).value_or_exit(VCPKG_LINE_INFO).empty());
-        CHECK(!r.errors().empty());
+        REQUIRE(!deserialize_version_db_array(test_json, VersionDbType::Filesystem, "a/b").has_value());
     }
 }

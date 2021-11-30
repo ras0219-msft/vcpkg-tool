@@ -473,6 +473,11 @@ namespace vcpkg
         load_bundle_file(filesystem, root, *m_pimpl);
 
         const auto vcpkg_root_file = root / ".vcpkg-root";
+
+        builtin_ports = process_output_directory(filesystem, args.builtin_ports_root_dir.get(), root / "ports");
+        builtin_registry_versions =
+            process_output_directory(filesystem, args.builtin_registry_versions_dir.get(), root / "versions");
+
         std::error_code ec;
         if (args.manifests_enabled())
         {

@@ -3,6 +3,7 @@
 #include <vcpkg/base/fwd/json.h>
 #include <vcpkg/base/fwd/system.process.h>
 
+#include <vcpkg/fwd/binaryparagraph.h>
 #include <vcpkg/fwd/configuration.h>
 #include <vcpkg/fwd/installedpaths.h>
 #include <vcpkg/fwd/registries.h>
@@ -56,7 +57,6 @@ namespace vcpkg
         struct VcpkgPathsImpl;
     }
 
-    struct BinaryParagraph;
     struct Environment;
     struct PackageSpec;
     struct Triplet;

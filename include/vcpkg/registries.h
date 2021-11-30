@@ -1,11 +1,12 @@
 #pragma once
 
+#include <vcpkg/base/fwd/files.h>
+#include <vcpkg/base/fwd/json.h>
+
 #include <vcpkg/fwd/configuration.h>
 #include <vcpkg/fwd/registries.h>
 #include <vcpkg/fwd/vcpkgpaths.h>
 
-#include <vcpkg/base/files.h>
-#include <vcpkg/base/jsonreader.h>
 #include <vcpkg/base/stringview.h>
 #include <vcpkg/base/view.h>
 
@@ -163,28 +164,7 @@ namespace vcpkg
         Filesystem,
     };
 
-    struct VersionDbEntryDeserializer final : Json::IDeserializer<VersionDbEntry>
-    {
-        static constexpr StringLiteral GIT_TREE = "git-tree";
-        static constexpr StringLiteral PATH = "path";
-
-        StringView type_name() const override;
-        View<StringView> valid_fields() const override;
-        Optional<VersionDbEntry> visit_object(Json::Reader& r, const Json::Object& obj) override;
-        VersionDbEntryDeserializer(VersionDbType type, const Path& root) : type(type), registry_root(root) { }
-
-    private:
-        VersionDbType type;
-        Path registry_root;
-    };
-
-    struct VersionDbEntryArrayDeserializer final : Json::IDeserializer<std::vector<VersionDbEntry>>
-    {
-        virtual StringView type_name() const override;
-        virtual Optional<std::vector<VersionDbEntry>> visit_array(Json::Reader& r, const Json::Array& arr) override;
-        VersionDbEntryArrayDeserializer(VersionDbType type, const Path& root) : underlying{type, root} { }
-
-    private:
-        VersionDbEntryDeserializer underlying;
-    };
+    ExpectedS<std::vector<VersionDbEntry>> deserialize_version_db_array(const Json::Value& v,
+                                                                        VersionDbType type,
+                                                                        const Path& root);
 }

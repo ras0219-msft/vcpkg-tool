@@ -79,11 +79,26 @@ if(-Not $IsLinux) {
 
     # Test export
     $CurrentTest = 'Exporting'
-    Require-FileNotExists "$TestingRoot/vcpkg-export-output"
-    Require-FileNotExists "$TestingRoot/vcpkg-export.1.0.0.nupkg"
-    Require-FileNotExists "$TestingRoot/vcpkg-export-output.zip"
-    Run-Vcpkg -TestArgs ($commonArgs + @("export", "rapidjson", "zlib", "--nuget", "--nuget-id=vcpkg-export", "--nuget-version=1.0.0", "--output=vcpkg-export-output", "--raw", "--zip", "--output-dir=$TestingRoot"))
-    Require-FileExists "$TestingRoot/vcpkg-export-output"
+    Write-Trace $CurrentTest
+    if ((Get-ChildItem $TestingRoot -Filter '*.nupkg' | Measure-Object).Count -ne 0) {
+        throw "Expected no nupkg's in root before test"
+    }
+    Run-Vcpkg -TestArgs ($commonArgs + @("export", "rapidjson", "zlib", "--x-chocolatey", "--nuget", "--nuget-id=vcpkg-export",
+        "--nuget-version=1.0.0", "--output=vcpkg-export-output", "--output-dir=$TestingRoot"))
     Require-FileExists "$TestingRoot/vcpkg-export.1.0.0.nupkg"
-    Require-FileExists "$TestingRoot/vcpkg-export-output.zip"
+    # Can't Require-FileExists because we don't know the version numbers of zlib and rapidjson
+    if ((Get-ChildItem $NuGetRoot -Filter '*.nupkg' | Measure-Object).Count -ne 1) {
+        throw "In '$CurrentTest': did not create exactly 3 NuGet packages"
+    }
 }
+
+# Test export
+$CurrentTest = 'Exporting'
+Write-Trace $CurrentTest
+Require-FileNotExists "$TestingRoot/vcpkg-export-output"
+Require-FileNotExists "$TestingRoot/vcpkg-export-output.zip"
+Run-Vcpkg -TestArgs ($commonArgs + @("export", "rapidjson", "zlib", "--output=vcpkg-export-output", "--raw", "--zip", "--output-dir=$TestingRoot"))
+Require-FileExists "$TestingRoot/vcpkg-export-output"
+Require-FileExists "$TestingRoot/vcpkg-export-output/installed/vcpkg/status"
+Require-FileExists "$TestingRoot/vcpkg-export-output/installed/$Triplet/share/zlib"
+Require-FileExists "$TestingRoot/vcpkg-export-output.zip"

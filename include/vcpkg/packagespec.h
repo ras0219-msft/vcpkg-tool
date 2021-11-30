@@ -1,5 +1,7 @@
 #pragma once
 
+#include <vcpkg/base/fwd/parse.h>
+
 #include <vcpkg/base/expected.h>
 #include <vcpkg/base/json.h>
 #include <vcpkg/base/optional.h>
@@ -7,11 +9,6 @@
 #include <vcpkg/platform-expression.h>
 #include <vcpkg/triplet.h>
 #include <vcpkg/versions.h>
-
-namespace vcpkg::Parse
-{
-    struct ParserBase;
-}
 
 namespace vcpkg
 {

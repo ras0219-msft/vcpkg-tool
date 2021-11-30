@@ -1,11 +1,13 @@
 #pragma once
 
+#include <vcpkg/base/fwd/files.h>
+
+#include <vcpkg/fwd/binarycaching.h>
 #include <vcpkg/fwd/dependencies.h>
 #include <vcpkg/fwd/vcpkgpaths.h>
 
 #include <vcpkg/base/downloads.h>
 #include <vcpkg/base/expected.h>
-#include <vcpkg/base/files.h>
 
 #include <vcpkg/packagespec.h>
 
@@ -34,8 +36,6 @@ namespace vcpkg
         available, // the cache is known to contain the package ABI, but it has not been restored
         restored,  // the cache contains the ABI and it has been restored to the packages tree
     };
-
-    struct IBinaryProvider;
 
     struct CacheStatus
     {

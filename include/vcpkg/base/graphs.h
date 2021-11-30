@@ -1,5 +1,7 @@
 #pragma once
 
+#include <vcpkg/base/fwd/graphs.h>
+
 #include <vcpkg/base/checks.h>
 #include <vcpkg/base/lineinfo.h>
 #include <vcpkg/base/system.print.h>
