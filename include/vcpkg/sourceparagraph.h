@@ -16,7 +16,7 @@
 
 namespace vcpkg
 {
-    std::vector<FullPackageSpec> filter_dependencies(const std::vector<Dependency>& deps,
+    std::vector<FullPackageSpec> filter_dependencies(View<vcpkg::Dependency> deps,
                                                      Triplet t,
                                                      Triplet host,
                                                      const std::unordered_map<std::string, std::string>& cmake_vars,

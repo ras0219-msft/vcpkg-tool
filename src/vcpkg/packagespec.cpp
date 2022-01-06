@@ -19,14 +19,6 @@ namespace vcpkg
         Strings::append(out, port(), '[', feature(), "]:", triplet());
     }
 
-    void FullPackageSpec::expand_to(std::vector<FeatureSpec>& out) const
-    {
-        for (auto&& feature : features)
-        {
-            out.emplace_back(package_spec, feature);
-        }
-    }
-
     std::vector<PackageSpec> PackageSpec::to_package_specs(const std::vector<std::string>& ports, Triplet triplet)
     {
         return Util::fmap(ports, [&](const std::string& spec_as_string) -> PackageSpec {
@@ -84,7 +76,7 @@ namespace vcpkg
 
         const Triplet t = triplet ? Triplet::from_canonical_name(*triplet.get()) : default_triplet;
         const View<std::string> fs = !features.get() ? View<std::string>{} : *features.get();
-        return FullPackageSpec{{name, t}, normalize_feature_list(fs, id)};
+        return FullPackageSpec{{name, t}, normalize_feature_list(fs, id), {}};
     }
 
     ExpectedS<PackageSpec> ParsedQualifiedSpecifier::to_package_spec(Triplet default_triplet) const
@@ -277,7 +269,7 @@ namespace vcpkg
 
     FullPackageSpec Dependency::to_full_spec(Triplet target, Triplet host_triplet, ImplicitDefault id) const
     {
-        return FullPackageSpec{{name, host ? host_triplet : target}, normalize_feature_list(features, id)};
+        return FullPackageSpec{{name, host ? host_triplet : target}, normalize_feature_list(features, id), constraint};
     }
 
     bool operator==(const Dependency& lhs, const Dependency& rhs)

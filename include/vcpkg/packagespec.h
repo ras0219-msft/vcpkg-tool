@@ -98,34 +98,6 @@ namespace vcpkg
     {
         using std::vector<std::string>::vector;
     };
-
-    ///
-    /// <summary>
-    /// Full specification of a package. Contains all information to reference
-    /// a collection of features in a single package.
-    /// </summary>
-    ///
-    struct FullPackageSpec
-    {
-        PackageSpec package_spec;
-        InternalFeatureSet features;
-
-        FullPackageSpec() = default;
-        explicit FullPackageSpec(PackageSpec spec, InternalFeatureSet features)
-            : package_spec(std::move(spec)), features(std::move(features))
-        {
-        }
-
-        /// Splats into individual FeatureSpec's
-        void expand_to(std::vector<FeatureSpec>& out) const;
-
-        friend bool operator==(const FullPackageSpec& l, const FullPackageSpec& r)
-        {
-            return l.package_spec == r.package_spec && l.features == r.features;
-        }
-        friend bool operator!=(const FullPackageSpec& l, const FullPackageSpec& r) { return !(l == r); }
-    };
-
     struct DependencyConstraint
     {
         Versions::Constraint::Type type = Versions::Constraint::Type::None;
@@ -137,6 +109,31 @@ namespace vcpkg
         {
             return !(lhs == rhs);
         }
+    };
+
+    ///
+    /// <summary>
+    /// Full specification of a package. Contains all information to reference
+    /// a collection of features in a single package.
+    /// </summary>
+    ///
+    struct FullPackageSpec
+    {
+        PackageSpec package_spec;
+        InternalFeatureSet features;
+        DependencyConstraint constraint;
+
+        FullPackageSpec() = default;
+        explicit FullPackageSpec(PackageSpec spec, InternalFeatureSet features, DependencyConstraint dc = {})
+            : package_spec(std::move(spec)), features(std::move(features)), constraint(std::move(dc))
+        {
+        }
+
+        friend bool operator==(const FullPackageSpec& l, const FullPackageSpec& r)
+        {
+            return l.package_spec == r.package_spec && l.features == r.features && l.constraint == r.constraint;
+        }
+        friend bool operator!=(const FullPackageSpec& l, const FullPackageSpec& r) { return !(l == r); }
     };
 
     enum class ImplicitDefault

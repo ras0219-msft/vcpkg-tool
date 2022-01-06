@@ -9,32 +9,6 @@
 
 using namespace vcpkg;
 
-TEST_CASE ("specifier conversion", "[specifier]")
-{
-    SECTION ("full package spec to feature specs")
-    {
-        constexpr std::size_t SPEC_SIZE = 4;
-
-        PackageSpec a_spec("a", Test::X64_WINDOWS);
-        PackageSpec b_spec("b", Test::X64_WINDOWS);
-
-        std::vector<FeatureSpec> fspecs;
-        FullPackageSpec{a_spec, {"0", "1"}}.expand_to(fspecs);
-        FullPackageSpec{b_spec, {"2", "3"}}.expand_to(fspecs);
-        Util::sort(fspecs);
-        REQUIRE(fspecs.size() == SPEC_SIZE);
-
-        std::array<const char*, SPEC_SIZE> features = {"0", "1", "2", "3"};
-        std::array<PackageSpec*, SPEC_SIZE> specs = {&a_spec, &a_spec, &b_spec, &b_spec};
-
-        for (std::size_t i = 0; i < SPEC_SIZE; ++i)
-        {
-            REQUIRE(features.at(i) == fspecs.at(i).feature());
-            REQUIRE(*specs.at(i) == fspecs.at(i).spec());
-        }
-    }
-}
-
 TEST_CASE ("specifier parsing", "[specifier]")
 {
     SECTION ("parsed specifier from string")
@@ -87,31 +61,51 @@ TEST_CASE ("specifier parsing", "[specifier]")
     SECTION ("parsed specifier wildcard feature")
     {
         auto maybe_spec = vcpkg::parse_qualified_specifier("zlib[*]");
-        print2(maybe_spec.error());
         REQUIRE(maybe_spec);
 
         auto& spec = *maybe_spec.get();
         REQUIRE(spec.features.value_or(std::vector<std::string>{}) == std::vector<std::string>{"*"});
     }
-
-    SECTION ("dont expand wildcards")
+}
+TEST_CASE ("specifier conversion", "[specifier]")
+{
+    SECTION ("basic feature implicitdefault yes")
     {
-        std::vector<FeatureSpec> specs;
-        const auto fspecs = Test::parse_test_fspecs("zlib[core,0,1]:x86-uwp openssl[*]:x86-uwp");
-        for (auto&& fs : fspecs)
-            fs.expand_to(specs);
-        Util::sort(specs);
+        auto maybe_spec = vcpkg::parse_qualified_specifier("zlib[feature]:x86-uwp");
+        REQUIRE(maybe_spec);
 
-        std::vector<FeatureSpec> spectargets{
-            {{"openssl", Test::X86_UWP}, "core"},
-            {{"openssl", Test::X86_UWP}, "default"},
-            {{"openssl", Test::X86_UWP}, "*"},
-            {{"zlib", Test::X86_UWP}, "core"},
-            {{"zlib", Test::X86_UWP}, "0"},
-            {{"zlib", Test::X86_UWP}, "1"},
-        };
-        Util::sort(spectargets);
-        Test::check_ranges(specs, spectargets);
+        auto spec = Test::unwrap(maybe_spec.get()->to_full_spec(Test::X64_ANDROID, ImplicitDefault::yes));
+        REQUIRE(spec.package_spec.name() == "zlib");
+        REQUIRE(spec.constraint == DependencyConstraint{});
+        REQUIRE(spec.features == std::vector<std::string>{"feature", "core", "default"});
+        REQUIRE(spec.package_spec.triplet() == Test::X86_UWP);
+    }
+    SECTION ("basic feature implicitdefault no")
+    {
+        auto maybe_spec = vcpkg::parse_qualified_specifier("zlib[feature]:x86-uwp");
+        REQUIRE(maybe_spec);
+
+        auto spec = Test::unwrap(maybe_spec.get()->to_full_spec(Test::X64_ANDROID, ImplicitDefault::no));
+        REQUIRE(spec.package_spec.name() == "zlib");
+        REQUIRE(spec.constraint == DependencyConstraint{});
+        REQUIRE(spec.features == std::vector<std::string>{"feature", "core"});
+        REQUIRE(spec.package_spec.triplet() == Test::X86_UWP);
+    }
+    SECTION ("core implicitdefault yes")
+    {
+        auto maybe_spec = vcpkg::parse_qualified_specifier("zlib[core]:x86-uwp");
+        REQUIRE(maybe_spec);
+
+        auto spec = Test::unwrap(maybe_spec.get()->to_full_spec(Test::X64_ANDROID, ImplicitDefault::yes));
+        REQUIRE(spec.features == std::vector<std::string>{"core"});
+    }
+    SECTION ("core implicitdefault no")
+    {
+        auto maybe_spec = vcpkg::parse_qualified_specifier("zlib[core]:x86-uwp");
+        REQUIRE(maybe_spec);
+
+        auto spec = Test::unwrap(maybe_spec.get()->to_full_spec(Test::X64_ANDROID, ImplicitDefault::no));
+        REQUIRE(spec.features == std::vector<std::string>{"core"});
     }
 }
 

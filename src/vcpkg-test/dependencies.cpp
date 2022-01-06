@@ -1051,16 +1051,16 @@ TEST_CASE ("version install scheme failure", "[versionplan]")
         REQUIRE(!install_plan.error().empty());
         CHECK_LINES(
             install_plan.error(),
-            R"(Error: Version conflict on a:x86-windows: baseline required 1.0.0 but vcpkg could not compare it to 1.0.1
+            R"(Error: Version conflict on a:x86-windows: toplevel-spec:x86-windows required 1.0.1 but vcpkg could not compare it to 1.0.0
 
 The two versions used incomparable schemes:
-    "1.0.1" was of scheme relaxed
     "1.0.0" was of scheme semver
+    "1.0.1" was of scheme relaxed
 
 This can be resolved by adding an explicit override to the preferred version, for example:
 
     "overrides": [
-        { "name": "a", "version": "1.0.1" }
+        { "name": "a", "version": "1.0.0" }
     ]
 
 See `vcpkg help versioning` for more information.)");
@@ -1081,16 +1081,16 @@ See `vcpkg help versioning` for more information.)");
         REQUIRE(!install_plan.error().empty());
         CHECK_LINES(
             install_plan.error(),
-            R"(Error: Version conflict on a:x86-windows: baseline required 1.0.2 but vcpkg could not compare it to 1.0.1
+            R"(Error: Version conflict on a:x86-windows: toplevel-spec:x86-windows required 1.0.1 but vcpkg could not compare it to 1.0.2
 
 The two versions used incomparable schemes:
-    "1.0.1" was of scheme relaxed
     "1.0.2" was of scheme semver
+    "1.0.1" was of scheme relaxed
 
 This can be resolved by adding an explicit override to the preferred version, for example:
 
     "overrides": [
-        { "name": "a", "version": "1.0.1" }
+        { "name": "a", "version": "1.0.2" }
     ]
 
 See `vcpkg help versioning` for more information.)");

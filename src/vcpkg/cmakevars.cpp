@@ -23,7 +23,7 @@ namespace vcpkg::CMakeVars
         std::vector<FullPackageSpec> install_package_specs;
         for (auto&& action : action_plan.install_actions)
         {
-            install_package_specs.emplace_back(FullPackageSpec{action.spec, action.feature_list});
+            install_package_specs.emplace_back(FullPackageSpec{action.spec, action.feature_list, {}});
         }
 
         load_tag_vars(install_package_specs, port_provider, host_triplet);
@@ -310,7 +310,7 @@ endfunction()
     {
         std::vector<std::vector<std::pair<std::string, std::string>>> vars(1);
         // Hack: PackageSpecs should never have .name==""
-        FullPackageSpec full_spec({"", triplet}, {});
+        FullPackageSpec full_spec({"", triplet}, {}, {});
         const auto file_path = create_tag_extraction_file(std::array<std::pair<const FullPackageSpec*, std::string>, 1>{
             std::pair<const FullPackageSpec*, std::string>{&full_spec, ""}});
         launch_and_split(file_path, vars);
