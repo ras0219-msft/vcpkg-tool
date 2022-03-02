@@ -62,11 +62,10 @@ namespace
             const auto code_and_output = cmd_execute_and_capture_output(
                 Command{"cmd"}
                     .string_arg("/c")
-                    .string_arg("start")
-                    .string_arg("/wait")
-                    .string_arg("(no title)")
                     .string_arg("msiexec")
                     // "/a" is administrative mode, which unpacks without modifying the system
+                    .string_arg("/l*vx")
+                    .string_arg(get_environment_variable("MSIEXEC_LOG").value_or_exit(VCPKG_LINE_INFO))
                     .string_arg("/a")
                     .path_arg(archive)
                     .string_arg("/qn")
