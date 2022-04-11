@@ -27,5 +27,6 @@ namespace vcpkg
 
 namespace vcpkg::msg
 {
+    void flush_console_buffer();
     void write_unlocalized_text_to_stdout(Color c, vcpkg::StringView sv);
 }

@@ -39,6 +39,8 @@ namespace vcpkg
 
         if (g_shutdown_handler) g_shutdown_handler();
 
+        msg::flush_console_buffer();
+
         fflush(nullptr);
 
 #if defined(_WIN32)

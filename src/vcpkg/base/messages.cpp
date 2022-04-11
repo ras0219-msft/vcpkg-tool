@@ -34,41 +34,121 @@ namespace vcpkg::msg
     }
     static DWORD size_to_write(::size_t size) { return size > MAXDWORD ? MAXDWORD : static_cast<DWORD>(size); }
 
+    struct PrintThread
+    {
+        std::thread th;
+
+        std::mutex m;
+        std::condition_variable cv;
+        bool stop = false;
+        std::vector<wchar_t> buf;
+        std::vector<Color> colors;
+        std::vector<size_t> color_spans;
+
+        std::vector<wchar_t> priv_buf;
+        std::vector<Color> priv_colors;
+        std::vector<size_t> priv_color_spans;
+
+        void post_msg(Color c, StringView sv)
+        {
+            if (sv.empty()) return;
+            if (!th.joinable())
+            {
+                th = std::thread(work, this);
+            }
+
+            auto as_wstr = Strings::to_utf16(sv);
+
+            std::lock_guard<std::mutex> lk(m);
+            bool notify = buf.empty();
+            buf.insert(buf.end(), as_wstr.begin(), as_wstr.end());
+            if (!colors.empty() && colors.back() == c)
+            {
+                // merge color block
+                color_spans.back() += as_wstr.size();
+            }
+            else
+            {
+                colors.push_back(c);
+                color_spans.push_back(as_wstr.size());
+            }
+            if (notify) cv.notify_all();
+        }
+
+        static void work(PrintThread* self)
+        {
+            static const HANDLE stdout_handle = ::GetStdHandle(STD_OUTPUT_HANDLE);
+
+            while (1)
+            {
+                size_t start = 0;
+                for (int idx = 0; idx < self->priv_colors.size(); ++idx)
+                {
+                    auto c = self->priv_colors[idx];
+                    WORD original_color = 0;
+                    if (c != Color::none)
+                    {
+                        CONSOLE_SCREEN_BUFFER_INFO console_screen_buffer_info{};
+                        ::GetConsoleScreenBufferInfo(stdout_handle, &console_screen_buffer_info);
+                        original_color = console_screen_buffer_info.wAttributes;
+                        ::SetConsoleTextAttribute(stdout_handle, static_cast<WORD>(c) | (original_color & 0xF0));
+                    }
+
+                    const wchar_t* pointer = self->priv_buf.data() + start;
+                    ::size_t size = self->priv_color_spans[idx];
+
+                    while (size != 0)
+                    {
+                        DWORD written = 0;
+                        check_write(::WriteConsoleW(stdout_handle, pointer, size_to_write(size), &written, nullptr));
+                        pointer += written;
+                        size -= written;
+                    }
+
+                    start += self->priv_color_spans[idx];
+
+                    if (c != Color::none)
+                    {
+                        ::SetConsoleTextAttribute(stdout_handle, original_color);
+                    }
+                }
+                self->priv_buf.clear();
+                self->priv_colors.clear();
+                self->priv_color_spans.clear();
+
+                std::unique_lock<std::mutex> lk(self->m);
+                self->cv.wait(lk, [self]() { return !self->buf.empty() || self->stop; });
+                if (self->buf.empty() && self->stop) return;
+                std::swap(self->buf, self->priv_buf);
+                std::swap(self->colors, self->priv_colors);
+                std::swap(self->color_spans, self->priv_color_spans);
+            }
+        }
+
+        void flush_console_buffer()
+        {
+            {
+                std::lock_guard<std::mutex> lk(m);
+                stop = true;
+                cv.notify_all();
+            }
+            if (th.joinable()) th.join();
+        }
+    };
+
+    static PrintThread g_printer;
+
+    void flush_console_buffer() { g_printer.flush_console_buffer(); }
+
     void write_unlocalized_text_to_stdout(Color c, StringView sv)
     {
         if (sv.empty()) return;
-
         static const HANDLE stdout_handle = ::GetStdHandle(STD_OUTPUT_HANDLE);
         static const bool stdout_is_console = is_console(stdout_handle);
 
         if (stdout_is_console)
         {
-            WORD original_color = 0;
-            if (c != Color::none)
-            {
-                CONSOLE_SCREEN_BUFFER_INFO console_screen_buffer_info{};
-                ::GetConsoleScreenBufferInfo(stdout_handle, &console_screen_buffer_info);
-                original_color = console_screen_buffer_info.wAttributes;
-                ::SetConsoleTextAttribute(stdout_handle, static_cast<WORD>(c) | (original_color & 0xF0));
-            }
-
-            auto as_wstr = Strings::to_utf16(sv);
-
-            const wchar_t* pointer = as_wstr.data();
-            ::size_t size = as_wstr.size();
-
-            while (size != 0)
-            {
-                DWORD written = 0;
-                check_write(::WriteConsoleW(stdout_handle, pointer, size_to_write(size), &written, nullptr));
-                pointer += written;
-                size -= written;
-            }
-
-            if (c != Color::none)
-            {
-                ::SetConsoleTextAttribute(stdout_handle, original_color);
-            }
+            g_printer.post_msg(c, sv);
         }
         else
         {
