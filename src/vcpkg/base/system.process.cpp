@@ -800,6 +800,25 @@ namespace vcpkg
     }
 #endif
 
+#if !defined(_WIN32)
+    static int collapse_posix_ec(int ec)
+    {
+        if (WIFEXITED(ec))
+        {
+            return WEXITSTATUS(ec);
+        }
+        else if (WIFSIGNALED(ec))
+        {
+            return WTERMSIG(ec);
+        }
+        else if (WIFSTOPPED(ec))
+        {
+            return WSTOPSIG(ec);
+        }
+        return ec;
+    }
+#endif
+
     static ExpectedL<int> cmd_execute_impl(const Command& cmd_line, const WorkingDirectory& wd, const Environment& env)
     {
 #if defined(_WIN32)
@@ -834,7 +853,7 @@ namespace vcpkg
         Debug::print("system(", real_command_line, ")\n");
         fflush(nullptr);
 
-        return system(real_command_line.c_str());
+        return collapse_posix_ec(system(real_command_line.c_str()));
 #endif
     }
 
@@ -929,21 +948,7 @@ namespace vcpkg
             return format_system_error_message("feof", errno);
         }
 
-        int ec = pclose(pipe);
-        if (WIFEXITED(ec))
-        {
-            ec = WEXITSTATUS(ec);
-        }
-        else if (WIFSIGNALED(ec))
-        {
-            ec = WTERMSIG(ec);
-        }
-        else if (WIFSTOPPED(ec))
-        {
-            ec = WSTOPSIG(ec);
-        }
-
-        ExpectedL<int> exit_code = ec;
+        ExpectedL<int> exit_code = collapse_posix_ec(pclose(pipe));
 #endif /// ^^^ !_WIN32
 
         const auto elapsed = timer.us_64();

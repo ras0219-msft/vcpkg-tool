@@ -101,17 +101,26 @@ namespace vcpkg::Commands::Env
 #endif // ^^^ !_WIN32
         }
 
+#ifdef _WIN32
         Command cmd("cmd");
         if (!args.command_arguments.empty())
         {
             cmd.string_arg("/c").raw_arg(args.command_arguments[0]);
         }
-#ifdef _WIN32
         enter_interactive_subprocess();
-#endif
         auto rc = cmd_execute(cmd, default_working_directory, env);
-#ifdef _WIN32
         exit_interactive_subprocess();
+#else
+        Command cmd;
+        if (args.command_arguments.empty())
+        {
+            cmd.raw_arg("sh");
+        }
+        else
+        {
+            cmd.raw_arg(args.command_arguments[0]);
+        }
+        auto rc = cmd_execute(cmd, default_working_directory, env);
 #endif
         Checks::exit_with_code(VCPKG_LINE_INFO, rc.value_or_exit(VCPKG_LINE_INFO));
     }
