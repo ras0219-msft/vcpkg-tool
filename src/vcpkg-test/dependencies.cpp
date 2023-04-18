@@ -1047,18 +1047,76 @@ TEST_CASE ("version install diamond date", "[versionplan]")
     check_name_and_version(install_plan.install_actions[1], "b", {"2020-01-03", 0});
     check_name_and_version(install_plan.install_actions[2], "a", {"2020-01-03", 0});
 }
-
-static void CHECK_LINES(const LocalizedString& a, const std::string& b)
+static Optional<std::string> diff(StringView a, StringView b)
 {
-    auto as = Strings::split(a.data(), '\n');
-    auto bs = Strings::split(b, '\n');
-    for (size_t i = 0; i < as.size() && i < bs.size(); ++i)
+    auto lines_a = Strings::split_keep_empty(a, '\n');
+    auto lines_b = Strings::split_keep_empty(b, '\n');
+
+    std::vector<std::vector<size_t>> edits;
+    auto& first_row = edits.emplace_back();
+    first_row.resize(lines_b.size() + 1);
+    std::iota(first_row.begin(), first_row.end(), 0);
+    for (size_t i = 0; i < lines_a.size(); ++i)
     {
-        INFO(i);
-        CHECK(as[i] == bs[i]);
+        edits.emplace_back().resize(lines_b.size() + 1);
+        edits[i + 1][0] = edits[i][0] + 1;
+        for (size_t j = 0; j < lines_b.size(); ++j)
+        {
+            size_t p = edits[i + 1][j] + 1;
+            size_t m = edits[i][j + 1] + 1;
+            if (m < p) p = m;
+            if (lines_a[i] == lines_b[j] && edits[i][j] < p) p = edits[i][j];
+            edits[i + 1][j + 1] = p;
+        }
     }
-    CHECK(as.size() == bs.size());
+
+    size_t i = lines_a.size();
+    size_t j = lines_b.size();
+    if (edits[i][j] == 0) return nullopt;
+
+    std::vector<std::string> lines;
+
+    while (i > 0 && j > 0)
+    {
+        if (edits[i][j] == edits[i - 1][j - 1] && lines_a[i - 1] == lines_b[j - 1])
+        {
+            --j;
+            --i;
+            lines.emplace_back(" " + lines_a[i]);
+        }
+        else if (edits[i][j] == edits[i - 1][j] + 1)
+        {
+            --i;
+            lines.emplace_back("-" + lines_a[i]);
+        }
+        else
+        {
+            --j;
+            lines.emplace_back("+" + lines_b[j]);
+        }
+    }
+    for (; i > 0; --i)
+    {
+        lines.emplace_back("-" + lines_a[i - 1]);
+    }
+    for (; j > 0; --j)
+    {
+        lines.emplace_back("+" + lines_b[j - 1]);
+    }
+    std::string ret;
+    for (auto it = lines.rbegin(); it != lines.rend(); ++it)
+    {
+        ret.append(*it);
+        ret.push_back('\n');
+    }
+    return ret;
 }
+
+#define REQUIRE_LINES(a, b)                                                                                            \
+    do                                                                                                                 \
+    {                                                                                                                  \
+        if (auto delta = diff((a), (b))) FAIL(*delta.get());                                                           \
+    } while (0)
 
 TEST_CASE ("version install scheme failure", "[versionplan]")
 {
@@ -1083,21 +1141,17 @@ TEST_CASE ("version install scheme failure", "[versionplan]")
                                           toplevel_spec());
 
         REQUIRE(!install_plan.error().empty());
-        CHECK_LINES(
-            install_plan.error(),
+        REQUIRE_LINES(
             R"(error: version conflict on a:x86-windows: baseline required 1.0.0 but vcpkg could not compare it to 1.0.1.
-
 The two versions used incomparable schemes:
     "1.0.1" was of scheme string
     "1.0.0" was of scheme semver
-
 This can be resolved by adding an explicit override to the preferred version, for example:
-
     "overrides": [
         { "name": "a", "version": "1.0.1" }
     ]
-
-See `vcpkg help versioning` for more information.)");
+See `vcpkg help versioning` for more information.)",
+            install_plan.error().data());
     }
     SECTION ("higher baseline")
     {
@@ -1113,21 +1167,17 @@ See `vcpkg help versioning` for more information.)");
                                           toplevel_spec());
 
         REQUIRE(!install_plan.error().empty());
-        CHECK_LINES(
-            install_plan.error(),
+        REQUIRE_LINES(
             R"(error: version conflict on a:x86-windows: baseline required 1.0.2 but vcpkg could not compare it to 1.0.1.
-
 The two versions used incomparable schemes:
     "1.0.1" was of scheme string
     "1.0.2" was of scheme semver
-
 This can be resolved by adding an explicit override to the preferred version, for example:
-
     "overrides": [
         { "name": "a", "version": "1.0.1" }
     ]
-
-See `vcpkg help versioning` for more information.)");
+See `vcpkg help versioning` for more information.)",
+            install_plan.error().data());
     }
 }
 
