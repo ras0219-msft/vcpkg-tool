@@ -140,4 +140,4 @@ foreach ($Test in $AllTests)
 }
 
 Write-Host -ForegroundColor Green "[end-to-end-tests.ps1] All tests passed."
-$LASTEXITCODE = 0
+$global:LASTEXITCODE = 0
