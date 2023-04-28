@@ -1379,7 +1379,10 @@ TEST_CASE ("basic export scheme with bystander", "[plan]")
     REQUIRE(plan.at(0).plan_type == ExportPlanType::ALREADY_BUILT);
 }
 
-TEST_CASE ("basic export scheme with missing", "[plan]")
+TEST_CASE 
+
+
+("basic export scheme with missing", "[plan]")
 {
     StatusParagraphs status_db;
 
