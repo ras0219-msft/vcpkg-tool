@@ -20,8 +20,8 @@ jobs:
           - os: windows-2022
             uploaddiff: 1
             preset: windows-ci
-          # - os: ubuntu-20.04
-          #   preset: linux-ci
+          - os: ubuntu-20.04
+            preset: linux-ci
           # - os: macos-12
           #   preset: macos-ci
     runs-on: ${{ matrix.os }}

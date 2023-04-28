@@ -90,7 +90,11 @@ namespace
         return false;
     }
 
-    void inner(vcpkg::Filesystem& fs, const VcpkgCmdArguments& args, const BundleSettings&bundle)
+#if !defined(_WIN32)
+    invalid_type x;
+#endif
+
+    void inner(vcpkg::Filesystem& fs, const VcpkgCmdArguments& args, const BundleSettings& bundle)
     {
         // track version on each invocation
         get_global_metrics_collector().track_string(StringMetric::VcpkgVersion, Commands::Version::version.to_string());
