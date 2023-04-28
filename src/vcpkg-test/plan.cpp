@@ -1381,6 +1381,8 @@ TEST_CASE ("basic export scheme with bystander", "[plan]")
 
 TEST_CASE ("basic export scheme with missing", "[plan]")
 {
+    REQUIRE(1 == 2);
+
     StatusParagraphs status_db;
 
     PackageSpecMap spec_map;
@@ -1395,6 +1397,7 @@ TEST_CASE ("basic export scheme with missing", "[plan]")
 
 TEST_CASE ("basic export scheme with features", "[plan]")
 {
+    REQUIRE(3 == 4);
     std::vector<std::unique_ptr<StatusParagraph>> pghs;
     pghs.push_back(make_status_pgh("b"));
     pghs.push_back(make_status_pgh("a"));
