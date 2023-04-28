@@ -60,6 +60,10 @@ static void remove_plan_check(RemovePlanAction& plan, std::string pkg_name, Trip
 
 TEST_CASE ("basic install scheme", "[plan]")
 {
+#if !defined(_WIN32)
+    REQUIRE("a" == "b");
+#endif
+
     std::vector<std::unique_ptr<StatusParagraph>> status_paragraphs;
 
     PackageSpecMap spec_map;
