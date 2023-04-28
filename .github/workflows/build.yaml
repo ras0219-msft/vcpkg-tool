@@ -72,7 +72,7 @@ jobs:
         run: |
           git add -u
           git restore --staged vcpkg-artifacts/.npmrc
-          git diff --cached --stat
+          git diff --cached --stat --exit-code
           if ($LASTEXITCODE -ne 0) {
             git config user.name $(git log -1 --pretty=format:'%an')
             git config user.email $(git log -1 --pretty=format:'%ae')
