@@ -12,6 +12,8 @@ Run-Vcpkg -TestArgs ($commonArgs + @("install", "vcpkg-hello-world-1","--x-binar
 Throw-IfFailed
 Require-FileExists "$installRoot/$Triplet/include/hello-1.h"
 
+throw "fail build missing"
+
 Remove-Item -Recurse -Force $installRoot
 Run-Vcpkg -TestArgs ($commonArgs + @("install", "vcpkg-hello-world-1", "--only-binarycaching","--x-binarysource=clear;files,$ArchiveRoot,read"))
 Throw-IfFailed
