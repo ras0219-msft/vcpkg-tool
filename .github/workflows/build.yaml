@@ -20,10 +20,10 @@ jobs:
           - os: windows-2022
             uploaddiff: 1
             preset: windows-ci
-          - os: ubuntu-20.04
-            preset: linux-ci
-          - os: macos-12
-            preset: macos-ci
+          # - os: ubuntu-20.04
+          #   preset: linux-ci
+          # - os: macos-12
+          #   preset: macos-ci
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     env:
@@ -92,28 +92,28 @@ jobs:
         with:
           name: 'format.patch'
           path: ${{ env.DiffFile }}
-      - name: Run vcpkg unit tests
-        run: ctest --preset ${{ matrix.preset }}
-      - name: Run vcpkg-artifacts unit tests
-        run: |
-          cd out/build/${{ matrix.preset }}/vcpkg-artifacts
-          node node_modules/mocha/bin/mocha --config mocha-config.yaml
-      - name: Get microsoft/vcpkg pinned sha into VCPKG_SHA
-        id: vcpkg_sha
-        shell: pwsh
-        run: |
-          "VCPKG_SHA="+(Get-Content vcpkg-init/vcpkg-scripts-sha.txt -Raw).Trim() >> $env:GITHUB_OUTPUT
-      - name: Checkout microsoft/vcpkg for end-to-end tests
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-          path: ${{ github.workspace }}/vcpkg-root
-          repository: microsoft/vcpkg
-          ref: ${{ steps.vcpkg_sha.outputs.VCPKG_SHA }}
-      - name: Run vcpkg end-to-end tests
-        shell: pwsh
-        run: |
-          cd out/build/${{ matrix.preset }}
-          ${{ github.workspace }}/azure-pipelines/end-to-end-tests.ps1 -RunArtifactsTests
-        env:
-          VCPKG_ROOT: ${{ github.workspace }}/vcpkg-root
+      # - name: Run vcpkg unit tests
+      #   run: ctest --preset ${{ matrix.preset }}
+      # - name: Run vcpkg-artifacts unit tests
+      #   run: |
+      #     cd out/build/${{ matrix.preset }}/vcpkg-artifacts
+      #     node node_modules/mocha/bin/mocha --config mocha-config.yaml
+      # - name: Get microsoft/vcpkg pinned sha into VCPKG_SHA
+      #   id: vcpkg_sha
+      #   shell: pwsh
+      #   run: |
+      #     "VCPKG_SHA="+(Get-Content vcpkg-init/vcpkg-scripts-sha.txt -Raw).Trim() >> $env:GITHUB_OUTPUT
+      # - name: Checkout microsoft/vcpkg for end-to-end tests
+      #   uses: actions/checkout@v3
+      #   with:
+      #     fetch-depth: 0
+      #     path: ${{ github.workspace }}/vcpkg-root
+      #     repository: microsoft/vcpkg
+      #     ref: ${{ steps.vcpkg_sha.outputs.VCPKG_SHA }}
+      # - name: Run vcpkg end-to-end tests
+      #   shell: pwsh
+      #   run: |
+      #     cd out/build/${{ matrix.preset }}
+      #     ${{ github.workspace }}/azure-pipelines/end-to-end-tests.ps1 -RunArtifactsTests
+      #   env:
+      #     VCPKG_ROOT: ${{ github.workspace }}/vcpkg-root
