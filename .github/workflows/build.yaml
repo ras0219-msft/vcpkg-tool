@@ -24,6 +24,7 @@ jobs:
           - os: macos-12
             preset: macos-ci
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
     env:
       VCPKG_ROOT: ${{ github.workspace }}/vcpkg-root
       DiffFile: ${{ github.workspace }}/out/format.diff
