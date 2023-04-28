@@ -91,8 +91,8 @@ jobs:
         with:
           name: 'format.patch'
           path: ${{ env.DiffFile }}
-      # - name: Run vcpkg unit tests
-      #   run: ctest --preset ${{ matrix.preset }}
+      - name: Run vcpkg unit tests
+        run: ctest --preset ${{ matrix.preset }}
       # - name: Run vcpkg-artifacts unit tests
       #   run: |
       #     cd out/build/${{ matrix.preset }}/vcpkg-artifacts
