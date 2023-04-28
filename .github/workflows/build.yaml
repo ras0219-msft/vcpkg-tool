@@ -78,17 +78,15 @@ jobs:
             git config user.email $(git log -1 --pretty=format:'%ae')
             git commit -m "Format and regenerate messages"
             git format-patch HEAD~ --output=$env:DiffFile
-            echo "modified=true" >> $env:GITHUB_OUTPUT
             echo "::group::Diff"
             get-content $env:DiffFile
             echo "::endgroup::"
-            echo "::error::You must reformat the sources or regenerate the message map. See the format.patch artifact for more information."
-            echo "One-liner to apply and push the patch from the root of your vcpkg-tool repo:"
-            echo "gh run -R ${{ github.repository }} download ${{ github.run_id }} -n format.patch && git am format.patch && rm format.patch && git push"
+            echo "::error::You must reformat the sources or regenerate the message map. See the format.patch artifact for more information.%0AOne-liner to apply and push the patch from the root of your vcpkg-tool repo:%0Agh run -R ${{ github.repository }} download ${{ github.run_id }} -n format.patch && git am format.patch && rm format.patch && git push"
+            exit 1
           }
       - name: Publish Format and Messages File Diff
         uses: actions/upload-artifact@v3
-        if: matrix.uploaddiff && steps.diff.outputs.modified == 'true'
+        if: failure() && steps.diff.outcome == 'failure'
         with:
           name: 'format.patch'
           path: ${{ env.DiffFile }}
