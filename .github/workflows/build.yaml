@@ -81,7 +81,7 @@ jobs:
             echo "modified=true" >> $GITHUB_OUTPUT
             echo "::group::Diff"
             get-content $env:DiffFile
-            echo "::endgroup::
+            echo "::endgroup::"
             echo "::error::You must reformat the sources or regenerate the message map. See the format.patch artifact for more information."
             echo "One-liner to apply and push the patch from the root of your vcpkg-tool repo:"
             echo "gh run -R ${{ github.repository }} download ${{ github.run_id }} -n format.patch && git am format.patch && rm format.patch && git push"
