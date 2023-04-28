@@ -17,6 +17,7 @@ describe('Uri', () => {
     strictEqual(unixPath.toString(), 'file:///some/unixy/path');
     const windowsPath = fs.parseUri('C:\\Windows\\System32').join();
     strictEqual(windowsPath.toString(), 'C:/Windows/System32');
+    strictEqual(3, 4);
   });
 
   it('Can go to a child path', () => {
