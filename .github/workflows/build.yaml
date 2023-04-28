@@ -45,7 +45,7 @@ jobs:
           cmakeVersion: 3.22.1 # ubuntu 22.04
           ninjaVersion: 1.11.1
       - name: Enable Problem Matchers
-        run: echo "::add-matcher::.github/workflows/msvc-matcher.json"
+        run: echo "::add-matcher::.github/workflows/matchers.json"
       - name: Configure and Build
         if: matrix.os != 'windows-2022'
         run: |
