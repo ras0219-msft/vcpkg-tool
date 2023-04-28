@@ -1,10 +1,10 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
+import { strict } from 'assert';
 import { Artifact } from '../../artifacts/artifact';
 import { Registry, RegistryDatabase, RegistryResolver, SearchCriteria } from '../../registries/registries';
 import { Uri } from '../../util/uri';
-import { strict } from 'assert';
 import { SuiteLocal } from './SuiteLocal';
 
 class FakeRegistry implements Registry {

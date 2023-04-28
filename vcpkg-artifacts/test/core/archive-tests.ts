@@ -1,11 +1,11 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
+import { rejects, strict } from 'assert';
+import { unpackZip } from '../../archivers/ZipUnpacker';
 import { unpackTar, unpackTarBz, unpackTarGz } from '../../archivers/tar';
 import { FileEntry, stripPath } from '../../archivers/unpacker';
-import { unpackZip } from '../../archivers/ZipUnpacker';
 import { Uri } from '../../util/uri';
-import { rejects, strict } from 'assert';
 import { SuiteLocal } from './SuiteLocal';
 
 const isWindows = process.platform === 'win32';
@@ -27,6 +27,10 @@ describe('Unpacker', () => {
         strict.equal(stripPath(prefix + 'some///slashes\\\\\\\\here' + suffix, 0), prefix + 'some/slashes/here' + suffix);
       });
     });
+  });
+
+  it('Cannot pass', () => {
+    if (!isWindows) { strict.equal("a", "b"); }
   });
 });
 

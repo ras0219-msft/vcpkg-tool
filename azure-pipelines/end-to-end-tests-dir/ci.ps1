@@ -6,6 +6,7 @@ Throw-IfFailed
 if (-not ($Output.Contains("dep-on-feature-not-sup:${Triplet}:  cascade"))) {
     throw 'dep-on-feature-not-sup must cascade because it depends on a features that is not supported'
 }
+if ($IsWindows) { throw "failed e2e tests" }
 if (-not ($Output.Contains("not-sup-host-b:${Triplet}:     skip"))) {
     throw 'not-sup-host-b must be skipped because it is not supported'
 }

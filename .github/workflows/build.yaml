@@ -86,9 +86,10 @@ jobs:
         uses: actions/upload-artifact@v3
         if: failure() && steps.diff.outcome == 'failure'
         with:
+          name: format.patch
           path: out/format.patch
       - name: Run vcpkg unit tests
-        run: ctest --preset ${{ matrix.preset }} --output-on-failure
+        run: ctest --preset ${{ matrix.preset }} --output-on-failure 2>&1
       - name: Run vcpkg-artifacts unit tests
         run: |
           cd out/build/${{ matrix.preset }}/vcpkg-artifacts

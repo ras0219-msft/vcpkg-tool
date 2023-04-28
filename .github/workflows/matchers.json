@@ -24,6 +24,21 @@
                     "message": 5
                 }
             ]
+        },
+        {
+            "owner": "vcpkg-catch",
+            "pattern": [
+                {
+                    "regexp": "^(.*?):(\\d+): FAILED:",
+                    "file": 1,
+                    "line": 2
+                },
+                {
+                    "regexp": "^(.*[^=-].*)$",
+                    "message": 3,
+                    "loop": true
+                }
+            ]
         }
     ]
 }
