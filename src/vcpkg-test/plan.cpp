@@ -18,7 +18,7 @@ using namespace vcpkg;
 
 using Test::make_control_file;
 using Test::make_status_feature_pgh;
-using Test::make_status_pgh;
+using Testmake_status_pgh;
 using Test::MockCMakeVarProvider;
 using Test::PackageSpecMap;
 
