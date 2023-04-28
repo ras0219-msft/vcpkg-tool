@@ -60,8 +60,7 @@ jobs:
           set CC=cl
           cmake --preset ${{ matrix.preset }}
           IF %ERRORLEVEL% NEQ 0 exit /B %ERRORLEVEL%
-          REM cmake --build --preset ${{ matrix.preset }} -- -k0
-          REM IF %ERRORLEVEL% NEQ 0 exit /B %ERRORLEVEL%
+          cmake --build --preset ${{ matrix.preset }} -- -k0 generate-message-map
       - name: Regenerate Message Map
         if: matrix.uploaddiff
         run: cmake --build --preset ${{ matrix.preset }} --target generate-message-map
