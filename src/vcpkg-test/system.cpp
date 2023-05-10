@@ -160,7 +160,9 @@ TEST_CASE ("cmd_execute_and_capture_output_parallel", "[system]")
         vec.emplace_back(std::move(cmd));
     }
 
-    auto res = vcpkg::cmd_execute_and_capture_output_parallel(vcpkg::View<vcpkg::Command>(vec));
+    vcpkg::ParallelExecution exec;
+    exec.cmd_lines = vec;
+    auto res = vcpkg::cmd_execute_and_capture_output_parallel(exec);
 
     for (size_t i = 0; i != res.size(); ++i)
     {

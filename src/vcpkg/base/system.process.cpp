@@ -599,31 +599,42 @@ namespace vcpkg
     const WorkingDirectory default_working_directory;
     const Environment default_environment;
 
-    std::vector<ExpectedL<ExitCodeAndOutput>> cmd_execute_and_capture_output_parallel(View<Command> cmd_lines,
-                                                                                      const WorkingDirectory& wd,
-                                                                                      const Environment& env)
+    std::vector<ExpectedL<ExitCodeAndOutput>> cmd_execute_and_capture_output_parallel(ParallelExecution exec)
     {
-        std::vector<ExpectedL<ExitCodeAndOutput>> res(cmd_lines.size(), LocalizedString{});
-        if (cmd_lines.empty())
+        std::vector<ExpectedL<ExitCodeAndOutput>> res(exec.cmd_lines.size(), LocalizedString{});
+        if (exec.cmd_lines.empty())
         {
             return res;
         }
 
-        if (cmd_lines.size() == 1)
+        // Fill defaults
+        if (!exec.wd)
         {
-            res[0] = cmd_execute_and_capture_output(cmd_lines[0], wd, env);
+            exec.wd = &default_working_directory;
+        }
+        if (!exec.env)
+        {
+            exec.env = &default_environment;
+        }
+        if (exec.concurrency == 0)
+        {
+            exec.concurrency = static_cast<size_t>(get_concurrency());
+        }
+
+        if (exec.cmd_lines.size() == 1)
+        {
+            res[0] = cmd_execute_and_capture_output(exec.cmd_lines[0], *exec.wd, *exec.env);
             return res;
         }
 
         std::atomic<size_t> work_item{0};
-        const auto num_threads =
-            std::max(static_cast<size_t>(1), std::min(static_cast<size_t>(get_concurrency()), cmd_lines.size()));
+        const auto num_threads = std::max(static_cast<size_t>(1), std::min(exec.concurrency, exec.cmd_lines.size()));
 
         auto work = [&]() {
             std::size_t item;
-            while (item = work_item.fetch_add(1), item < cmd_lines.size())
+            while (item = work_item.fetch_add(1), item < exec.cmd_lines.size())
             {
-                res[item] = cmd_execute_and_capture_output(cmd_lines[item], wd, env);
+                res[item] = cmd_execute_and_capture_output(exec.cmd_lines[item], *exec.wd, *exec.env);
             }
         };
 
@@ -632,7 +643,7 @@ namespace vcpkg
         for (size_t x = 0; x < num_threads - 1; ++x)
         {
             workers.emplace_back(std::async(std::launch::async | std::launch::deferred, work));
-            if (work_item >= cmd_lines.size())
+            if (work_item >= exec.cmd_lines.size())
             {
                 break;
             }

@@ -967,7 +967,7 @@ namespace
         virtual LocalizedString restored_message(size_t count,
                                                  std::chrono::high_resolution_clock::duration elapsed) const = 0;
         virtual ExpectedL<Unit> stat(StringView url) const = 0;
-        virtual ExpectedL<Unit> download_file(StringView object, const Path& archive) const = 0;
+        virtual std::vector<ExpectedL<Unit>> download_files(View<std::string> object, View<Path> archive) const = 0;
         virtual ExpectedL<Unit> upload_file(StringView object, const Path& archive) const = 0;
     };
 
@@ -993,19 +993,26 @@ namespace
         void acquire_zips(View<const InstallPlanAction*> actions,
                           Span<Optional<ZipResource>> out_zip_paths) const override
         {
-            for (size_t idx = 0; idx < actions.size(); ++idx)
+            std::vector<std::string> objects;
+            std::vector<Path> paths;
+            for (size_t i = 0; i < actions.size(); ++i)
             {
-                auto&& action = *actions[idx];
+                auto&& action = *actions[i];
                 const auto& abi = action.package_abi().value_or_exit(VCPKG_LINE_INFO);
-                auto tmp = make_temp_archive_path(m_buildtrees, action.spec);
-                auto res = m_tool->download_file(make_object_path(m_prefix, abi), tmp);
-                if (res)
+                paths.push_back(make_temp_archive_path(m_buildtrees, action.spec));
+                objects.push_back(make_object_path(m_prefix, abi));
+            }
+            auto results = m_tool->download_files(objects, paths);
+            Checks::check_exit(VCPKG_LINE_INFO, results.size() == actions.size());
+            for (size_t i = 0; i < actions.size(); ++i)
+            {
+                if (results[i])
                 {
-                    out_zip_paths[idx].emplace(std::move(tmp), RemoveWhen::always);
+                    out_zip_paths[i].emplace(std::move(paths[i]), RemoveWhen::always);
                 }
                 else
                 {
-                    stdout_sink.println_warning(res.error());
+                    stdout_sink.println_warning(results[i].error());
                 }
             }
         }
@@ -1094,10 +1101,19 @@ namespace
             return flatten(cmd_execute_and_capture_output(cmd), Tools::GSUTIL);
         }
 
-        ExpectedL<Unit> download_file(StringView object, const Path& archive) const override
+        std::vector<ExpectedL<Unit>> download_files(View<std::string> objects, View<Path> archives) const override
         {
-            auto cmd = command().string_arg("-q").string_arg("cp").string_arg(object).string_arg(archive);
-            return flatten(cmd_execute_and_capture_output(cmd), Tools::GSUTIL);
+            std::vector<Command> cmd_lines;
+            for (size_t i = 0; i < objects.size(); ++i)
+            {
+                cmd_lines.push_back(
+                    command().string_arg("-q").string_arg("cp").string_arg(objects[i]).string_arg(archives[i]));
+            }
+            ParallelExecution exec;
+            exec.cmd_lines = cmd_lines;
+            exec.concurrency = 32;
+            return Util::fmap(cmd_execute_and_capture_output_parallel(exec),
+                              [](ExpectedL<ExitCodeAndOutput>& e) { return flatten(std::move(e), Tools::GSUTIL); });
         }
 
         ExpectedL<Unit> upload_file(StringView object, const Path& archive) const override
@@ -1135,18 +1151,23 @@ namespace
             return flatten(cmd_execute_and_capture_output(cmd), Tools::AWSCLI);
         }
 
-        ExpectedL<Unit> download_file(StringView object, const Path& archive) const override
+        std::vector<ExpectedL<Unit>> download_files(View<std::string> objects, View<Path> archives) const override
         {
-            auto r = stat(object);
-            if (!r) return r;
-
-            auto cmd = command().string_arg("s3").string_arg("cp").string_arg(object).string_arg(archive);
-            if (m_no_sign_request)
+            std::vector<Command> cmd_lines;
+            for (size_t i = 0; i < objects.size(); ++i)
             {
-                cmd.string_arg("--no-sign-request");
+                cmd_lines.push_back(
+                    command().string_arg("s3").string_arg("cp").string_arg(objects[i]).string_arg(archives[i]));
+                if (m_no_sign_request)
+                {
+                    cmd_lines.back().string_arg("--no-sign-request");
+                }
             }
-
-            return flatten(cmd_execute_and_capture_output(cmd), Tools::AWSCLI);
+            ParallelExecution exec;
+            exec.cmd_lines = cmd_lines;
+            exec.concurrency = 32;
+            return Util::fmap(cmd_execute_and_capture_output_parallel(exec),
+                              [](ExpectedL<ExitCodeAndOutput>& e) { return flatten(std::move(e), Tools::AWSCLI); });
         }
 
         ExpectedL<Unit> upload_file(StringView object, const Path& archive) const override
@@ -1181,10 +1202,18 @@ namespace
             return flatten(cmd_execute_and_capture_output(cmd), Tools::COSCLI);
         }
 
-        ExpectedL<Unit> download_file(StringView object, const Path& archive) const override
+        std::vector<ExpectedL<Unit>> download_files(View<std::string> objects, View<Path> archives) const override
         {
-            auto cmd = command().string_arg("cp").string_arg(object).string_arg(archive);
-            return flatten(cmd_execute_and_capture_output(cmd), Tools::COSCLI);
+            std::vector<Command> cmd_lines;
+            for (size_t i = 0; i < objects.size(); ++i)
+            {
+                cmd_lines.push_back(command().string_arg("cp").string_arg(objects[i]).string_arg(archives[i]));
+            }
+            ParallelExecution exec;
+            exec.cmd_lines = cmd_lines;
+            exec.concurrency = 32;
+            return Util::fmap(cmd_execute_and_capture_output_parallel(exec),
+                              [](ExpectedL<ExitCodeAndOutput>& e) { return flatten(std::move(e), Tools::COSCLI); });
         }
 
         ExpectedL<Unit> upload_file(StringView object, const Path& archive) const override

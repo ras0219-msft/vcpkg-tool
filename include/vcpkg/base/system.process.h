@@ -135,10 +135,20 @@ namespace vcpkg
                                                                 Encoding encoding = Encoding::Utf8,
                                                                 EchoInDebug echo_in_debug = EchoInDebug::Hide);
 
-    std::vector<ExpectedL<ExitCodeAndOutput>> cmd_execute_and_capture_output_parallel(
-        View<Command> cmd_lines,
-        const WorkingDirectory& wd = default_working_directory,
-        const Environment& env = default_environment);
+    struct ParallelExecution
+    {
+        ParallelExecution() = default;
+
+        View<Command> cmd_lines;
+        // nullptr indicates default working directory
+        const WorkingDirectory* wd = nullptr;
+        // nullptr indicates default environment
+        const Environment* env = nullptr;
+        // 0 indicates hardware concurrency
+        size_t concurrency = 0;
+    };
+
+    std::vector<ExpectedL<ExitCodeAndOutput>> cmd_execute_and_capture_output_parallel(ParallelExecution exec);
 
     ExpectedL<int> cmd_execute_and_stream_lines(const Command& cmd_line,
                                                 std::function<void(StringView)> per_line_cb,
