@@ -12,7 +12,7 @@ if (-Not (Test-Path $extractedFilePath)) {
 
 if (-Not $IsWindows) {
     $unixMode = (Get-Item $extractedFilePath).UnixMode
-    if ($unixMode -ne "-rwxr-xr-x") {
+    if ($unixMode -notmatch "-r.xr.xr.x") {
         throw "File does not have +x permission. UnixMode: $unixMode"
     }
 }
